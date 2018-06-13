@@ -18,9 +18,21 @@ class Component:
 			return
 		(now_translation, now_rotation) = multiplyTransforms(
 			base_translation, base_rotation, self.translation, self.rotation)
-		for (name, child) in self.children.items():
+		for child in self.children.values():
 			child.Create(now_translation, now_rotation)
 		self.created = True
+	def __getitem__(self, name):
+		return self.children[name]
+	def Id(self, name = None):
+		if name is None:
+			assert len(self.children) == 1, 'More than 1 child exist, must provide a name !'
+			return list(self.children.values())[0].Id()
+		return self.children[name].Id()
+	def AllIds(self):
+		ids = []
+		for child in self.children.values():
+			ids += child.AllIds()
+		return ids
 
 class SingleDomino(Component):
 	ORIENTATION_ALIAS = {
@@ -50,13 +62,20 @@ class SingleDomino(Component):
 			basePosition = now_translation,
 			baseOrientation = now_rotation)
 		self.created = True
+	def Id(self):
+		return self.body_id if self.created else -1
+	def AllIds(self):
+		return [self.body_id]
 
 class PileDomino(Component):
 	def __init__(self, N, xy = [0, 0], angle = 0):
 		Component.__init__(self, [xy[0], xy[1], 0], [0, 0, angle])
-		self.N = N
-		for i in range(self.N):
-			self.children[str(i)] = SingleDomino([0, 0, SX * (i + 0.5)], 'zyx')
+		for i in range(N):
+			self.children[i] = SingleDomino([0, 0, SX * (i + 0.5)], 'zyx')
+	def BottomId(self):
+		return self.children[0].Id()
+	def TopId(self):
+		return self.children[len(self.children) - 1].Id()
 
 class LineDomino(Component):
 	# interval = SZ / INTERVAL_RATIO
@@ -73,7 +92,11 @@ class LineDomino(Component):
 		N_domino = N_interval - 1 + sum(contain)
 		z = SY / 2 if side else SZ / 2
 		for i in range(N_domino):
-			self.children[str(i)] = SingleDomino([interval * (i + 1 - contain[0]), 0, base_z + z], 'xzy' if side else 'xyz')
+			self.children[i] = SingleDomino([interval * (i + 1 - contain[0]), 0, base_z + z], 'xzy' if side else 'xyz')
+	def StartId(self):
+		return self.children[0].Id()
+	def EndId(self):
+		return self.children[len(self.children) - 1].Id()
 
 class LeanTrigger(Component):
 	# Initially place it with angle = math.atan(SX / SZ) + LEAN_ANGLE.
@@ -91,7 +114,7 @@ class EdgeTrigger(Component):
 	def __init__(self, xy = [0, 0], angle = 0):
 		Component.__init__(self, [xy[0], xy[1], 0], [0, 0, angle])
 		self.children['base'] = SingleDomino([-SY / 2, 0, SX / 2], [0, math.pi / 2, math.pi / 2])
-		self.children['triiger'] = SingleDomino([SX * (0.5 - EdgeTrigger.CONTACT_RATIO), 0, SX + SZ / 2], 'xyz')
+		self.children['trigger'] = SingleDomino([SX * (0.5 - EdgeTrigger.CONTACT_RATIO), 0, SX + SZ / 2], 'xyz')
 
 class SideBranch(Component):
 	# Initially only CONTACT_RATIO * SX part will stand on the base.
@@ -149,8 +172,6 @@ class AndGate(Component):
 		Component.__init__(self, [xy[0], xy[1], 0], [0, 0, angle])
 		self.children['barrier'] = LineDomino([0, -SX], [0, SX], interval = SX)
 		self.children['base'] = PileDomino(3, [(SX + SY + SZ) / 2, 0], 0)
-		# for i in range(3): # base
-		# 	self.children += [SingleDomino([(SX + SY + SZ) / 2, 0, (i + 0.5) * SX], 'zyx')]
 		self.children['highline'] = LineDomino([SY, 0], [SY + SX * 4, 0], interval = SX * 2, base_z = SX * 3)
 
 class FastPropagation(Component):
@@ -160,15 +181,16 @@ class FastPropagation(Component):
 		delta_xy = [end_xy[i] - start_xy[i] for i in range(2)]
 		yaw = math.atan2(delta_xy[1], delta_xy[0])
 		Component.__init__(self, [start_xy[0], start_xy[1], 0], [0, 0, yaw])
+		self.N = 0
 		distance = sum([delta_xy[i] ** 2 for i in range(2)]) ** 0.5
-		index = 0
-		self.children[str(index)] = SingleDomino([0, 0, SY / 2], 'yzx')
+		self.children[self.N] = SingleDomino([0, 0, SY / 2], 'yzx')
+		self.N += 1
 		alpha = math.asin(SY / SZ * (1 - FastPropagation.CONTACT_RATIO))
 		x = SZ / 2 + SZ * (0.5 - FastPropagation.CONTACT_RATIO) * math.cos(alpha) + SY / 2 * math.sin(alpha)
 		z = SY - SZ * (0.5 - FastPropagation.CONTACT_RATIO) * math.sin(alpha) + SY / 2 * math.cos(alpha)
 		while True:
-			index += 1
-			self.children[str(index)] = SingleDomino([x, 0, z], [math.pi / 2 + alpha, 0, math.pi / 2])
+			self.children[self.N] = SingleDomino([x, 0, z], [math.pi / 2 + alpha, 0, math.pi / 2])
+			self.N += 1
 			contact_x = x + SY / 2 * math.sin(alpha) + SZ * (0.5 - FastPropagation.CONTACT_RATIO) * math.cos(alpha)
 			contact_z = z + SY / 2 * math.cos(alpha) - SZ * (0.5 - FastPropagation.CONTACT_RATIO) * math.sin(alpha)
 			support_x = contact_x + (SZ ** 2 - contact_z ** 2) ** 0.5
@@ -180,3 +202,7 @@ class FastPropagation(Component):
 				break
 			(alpha, x, z) = (new_alpha, new_x, new_z)
 		self.children['trigger'] = LeanTrigger([x, -SX / 2 - SZ * math.sin(math.atan(SX / SZ))], math.pi / 2)
+	def StartId(self):
+		return self.Id(0)
+	def EndId(self):
+		return self.Id(self.N - 1)

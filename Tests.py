@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 from Engine import *
+from Plugins import *
 from Components import *
 
 def GetLineDominoTest():
@@ -67,9 +68,11 @@ def GetFastPropagationTest():
 
 def Test(components):
 	engine = Engine(0.001)
+	engine.AddPlugin(TerminatorPlugin(engine))
+	engine.AddPlugin(PrinterPlugin(engine))
 	for component in components:
 		engine.AddComponent(component)
 	engine.Start()
 
 if __name__ == '__main__':
-	Test(GetCrossingTest())
+	Test(GetFastPropagationTest())

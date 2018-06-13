@@ -7,7 +7,7 @@ from pybullet import *
 
 from Engine import *
 
-class PluginBase:
+class Plugin:
 	def __init__(self, engine):
 		self.engine = engine
 	def OnAddComponent(self, component):
@@ -21,9 +21,9 @@ class PluginBase:
 	def OnTerminate(self):
 		pass
 
-class PrinterPlugin(PluginBase):
+class PrinterPlugin(Plugin):
 	def __init__(self, engine):
-		PluginBase.__init__(self, engine)
+		Plugin.__init__(self, engine)
 	def OnStart(self):
 		print('start simulation')
 	def OnBeforeStep(self):
@@ -32,7 +32,7 @@ class PrinterPlugin(PluginBase):
 	def OnTerminate(self):
 		print('terminated, total time elapsed: %f' % self.engine.elapsed)
 
-class TerminatorPlugin(PluginBase):
+class TerminatorPlugin(Plugin):
 	SPEED_THRESHOLD = 1.0E-2
 	SPIN_THRESHOLD = 1.0E-1
 	class BodiesStatus:
@@ -72,8 +72,8 @@ class TerminatorPlugin(PluginBase):
 				if angle > delta_time * TerminatorPlugin.SPIN_THRESHOLD:
 					return True
 			return False
-	def __init__(self, engine, time_range = 0.1):
-		PluginBase.__init__(self, engine)
+	def __init__(self, engine, time_range = 0.5):
+		Plugin.__init__(self, engine)
 		self.time_range = time_range
 		self.size = max(2, int(time_range / self.engine.time_step))
 		self.status = [None] * self.size

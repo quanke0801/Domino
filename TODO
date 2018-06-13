@@ -1,0 +1,4 @@
+1, Refactor all tests from functions into classes.
+2, Subclasses of TestBase should override a function to specify list of ids to track (only at the end).
+3, Create file IO plugin.
+4, Create port.

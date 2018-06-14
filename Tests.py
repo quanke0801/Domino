@@ -80,10 +80,11 @@ def GetFastPropagationTest():
 
 def Test(test):
 	engine = Engine(0.001)
-	engine.AddPlugin(TerminatorPlugin(engine))
-	engine.AddPlugin(PrinterPlugin(engine))
+	engine.AddPlugin(PrintPlugin(engine))
+	engine.AddPlugin(AutoTerminatePlugin(engine))
+	engine.AddPlugin(KeyboardEventPlugin(engine))
 	engine.AddComponent(test)
 	engine.Start()
 
 if __name__ == '__main__':
-	Test(GetFastPropagationTest())
+	Test(GetLineDominoTest())

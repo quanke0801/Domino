@@ -78,13 +78,24 @@ def GetFastPropagationTest():
 		'line2': LineDomino([SZ * 30, -SX], [SZ * 30, 1], (False, True))}
 	return test
 
-def Test(test):
+def Test():
+	# engine = Engine(0.001)
+	# engine.AddPlugin(PrintPlugin(engine))
+	# engine.AddPlugin(AutoTerminatePlugin(engine))
+	# engine.AddPlugin(KeyboardEventPlugin(engine))
+	# engine.AddComponent(test)
+	# engine.Start()
 	engine = Engine(0.001)
+	test = GetLineDominoTest()
+	engine.AddComponent(test)
+	s1 = [test['trigger1'].Id(), test['line1'].StartId(), test['line1'].EndId()]
+	s2 = [test['trigger2'].Id(), test['line2'].StartId(), test['line2'].EndId()]
+	s3 = [test['line2'].EndId(), test['line1'].EndId()]
 	engine.AddPlugin(PrintPlugin(engine))
 	engine.AddPlugin(AutoTerminatePlugin(engine))
-	engine.AddPlugin(KeyboardEventPlugin(engine))
-	engine.AddComponent(test)
+	engine.AddPlugin(SequenceMonitorPlugin(engine, [s1, s2, s3]))
 	engine.Start()
 
 if __name__ == '__main__':
-	Test(GetLineDominoTest())
+	test = GetLineDominoTest()
+	Test()

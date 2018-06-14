@@ -1,4 +1,11 @@
-1, Refactor all tests from functions into classes.
-2, Subclasses of TestBase should override a function to specify list of ids to track (only at the end).
-3, Create file IO plugin.
-4, Create port.
+SequenceMonitorPlugin should only monitor 1 sequence (use more plugins to monitor more sequences).
+
+Modify SequenceMonitorPlugin to support resetting sequence and use map only, so that it can support monitoring objects added during simulation by overriding OnAddComponent().
+
+Refactor all tests from functions into classes.
+
+Subclasses of TestBase should override a function to specify list of ids to track (only at the end).
+
+Create file IO plugin.
+
+Create port.

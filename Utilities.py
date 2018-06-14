@@ -29,7 +29,7 @@ class WorldStatus:
 		return [si1.Difference(si2) for (si1, si2) in zip(self.status, other.status)]
 
 class RecordedStatus:
-	def __init__(self, engine, sample_interval = 0.1, time_span = -1):
+	def __init__(self, engine, sample_interval = 0.05, time_span = -1):
 		self.engine = engine
 		self.sample_interval = sample_interval
 		self.time_span = time_span

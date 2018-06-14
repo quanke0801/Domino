@@ -52,17 +52,52 @@ class AutoTerminatePlugin(Plugin):
 		Plugin.__init__(self, engine)
 		self.window = window
 	def OnUpdateRecord(self):
-		last = self.engine.record.GetLatest()
-		if last.time_stamp <= self.window:
+		latest = self.engine.record.GetLatest()
+		if latest.time_stamp <= self.window:
 			return
-		first = self.engine.record.Get(last.time_stamp - self.window)
-		delta_time = last.time_stamp - first.time_stamp
-		for (distance, angle) in last.Difference(first):
+		first = self.engine.record.Get(latest.time_stamp - self.window)
+		delta_time = latest.time_stamp - first.time_stamp
+		for (distance, angle) in latest.Difference(first):
 			if distance > AutoTerminatePlugin.SPEED_THRESHOLD * delta_time:
 				return
 			if angle > AutoTerminatePlugin.SPIN_THRESHOLD * delta_time:
 				return
 		self.engine.terminate = True
+
+class SequenceMonitorPlugin(Plugin):
+	DISTANCE_THRESHOLD = 1.0E-2
+	ANGLE_THRESHOLD = 1.0E-1
+	def __init__(self, engine, sequences):
+		print(sequences)
+		Plugin.__init__(self, engine)
+		self.sequences = sequences
+		self.trigger_timestamps = [[None] * len(sequence) for sequence in self.sequences]
+		self.initial_status = None
+		self.valid = True
+	def OnStart(self):
+		self.initial_status = self.engine.record.GetLatest()
+	def OnUpdateRecord(self):
+		latest = self.engine.record.GetLatest()
+		for si in range(len(self.sequences)):
+			for i in range(len(self.sequences[si])):
+				if self.trigger_timestamps[si][i] is not None:
+					continue
+				body_id = self.sequences[si][i]
+				(distance, angle) = latest[body_id].Difference(self.initial_status[body_id])
+				print(body_id, latest.time_stamp, distance, angle)
+				if distance > SequenceMonitorPlugin.DISTANCE_THRESHOLD or angle > SequenceMonitorPlugin.ANGLE_THRESHOLD:
+					self.trigger_timestamps[si][i] = latest.time_stamp
+	def OnTerminate(self):
+		for si in range(len(self.sequences)):
+			for i in range(len(self.sequences[si])):
+				if self.trigger_timestamps[si][i] is None:
+					self.valid = False
+					# return
+				if i > 0 and self.trigger_timestamps[si][i] < self.trigger_timestamps[si][i - 1]:
+					self.valid = False
+					# return
+		print(self.valid)
+		print(self.trigger_timestamps)
 
 class KeyboardEventPlugin(Plugin):
 	def __init__(self, engine):

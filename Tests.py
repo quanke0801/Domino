@@ -284,14 +284,7 @@ def GetSquareTest():
 	return test
 
 if __name__ == '__main__':
-	test_classes = [
-		LineDominoTest,
-		UTurnTest,
-		AndGateTest,
-		CrossingTest,
-		SideBranchTest,
-		FastPropagationTest][: : -1]
-	for test_class in test_classes:
+	for test_class in ComponentTest.__subclasses__():
 		for arguments in test_class.GenerateArguments():
 			test = test_class(arguments)
 			print(test.name, test.arguments)

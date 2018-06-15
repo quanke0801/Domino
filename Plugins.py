@@ -64,40 +64,49 @@ class AutoTerminatePlugin(Plugin):
 				return
 		self.engine.terminate = True
 
-class SequenceMonitorPlugin(Plugin):
+class ComponentTestPlugin(Plugin):
 	DISTANCE_THRESHOLD = 1.0E-2
 	ANGLE_THRESHOLD = 1.0E-1
-	def __init__(self, engine, sequences):
-		print(sequences)
+	def __init__(self, engine, sequences = [[]], statics = []):
 		Plugin.__init__(self, engine)
 		self.sequences = sequences
-		self.trigger_timestamps = [[None] * len(sequence) for sequence in self.sequences]
-		self.initial_status = None
-		self.valid = True
+		self.sequence_moments = [[None] * len(sequence) for sequence in self.sequences]
+		self.statics = statics
+		self.static_moments = [None] * len(self.statics)
+		self.initial_states = None
+		self.test_success = True
 	def OnStart(self):
-		self.initial_status = self.engine.record.GetLatest()
+		self.initial_states = self.engine.record.GetLatest()
 	def OnUpdateRecord(self):
 		latest = self.engine.record.GetLatest()
 		for si in range(len(self.sequences)):
 			for i in range(len(self.sequences[si])):
-				if self.trigger_timestamps[si][i] is not None:
+				if self.sequence_moments[si][i] is not None:
 					continue
 				body_id = self.sequences[si][i]
-				(distance, angle) = latest[body_id].Difference(self.initial_status[body_id])
-				print(body_id, latest.time_stamp, distance, angle)
-				if distance > SequenceMonitorPlugin.DISTANCE_THRESHOLD or angle > SequenceMonitorPlugin.ANGLE_THRESHOLD:
-					self.trigger_timestamps[si][i] = latest.time_stamp
+				(distance, angle) = latest[body_id].Difference(self.initial_states[body_id])
+				if distance > ComponentTestPlugin.DISTANCE_THRESHOLD or angle > ComponentTestPlugin.ANGLE_THRESHOLD:
+					self.sequence_moments[si][i] = latest.time_stamp
+		for i in range(len(self.statics)):
+			if self.static_moments[i] is not None:
+				continue
+			body_id = self.statics[i]
+			(distance, angle) = latest[body_id].Difference(self.initial_states[body_id])
+			if distance > ComponentTestPlugin.DISTANCE_THRESHOLD or angle > ComponentTestPlugin.ANGLE_THRESHOLD:
+				self.static_moments[si][i] = latest.time_stamp
 	def OnTerminate(self):
 		for si in range(len(self.sequences)):
 			for i in range(len(self.sequences[si])):
-				if self.trigger_timestamps[si][i] is None:
-					self.valid = False
-					# return
-				if i > 0 and self.trigger_timestamps[si][i] < self.trigger_timestamps[si][i - 1]:
-					self.valid = False
-					# return
-		print(self.valid)
-		print(self.trigger_timestamps)
+				if self.sequence_moments[si][i] is None:
+					self.test_success = False
+					return
+				if i > 0 and self.sequence_moments[si][i] < self.sequence_moments[si][i - 1]:
+					self.test_success = False
+					return
+		for i in range(len(self.statics)):
+			if self.static_moments[i] is not None:
+				self.test_success = False
+				return
 
 class KeyboardEventPlugin(Plugin):
 	def __init__(self, engine):

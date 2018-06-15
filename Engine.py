@@ -15,11 +15,12 @@ class Engine:
 		self.time_step = time_step
 		self.elapsed = 0.0
 		self.plugins = []
-		self.record = RecordedStatus(self)
-		self.InitializePhysics(mode)
-	def InitializePhysics(self, mode):
-		connect(mode)
-		if mode == GUI:
+		self.record = RecordedState(self)
+		self.mode = mode
+		self.InitializePhysics()
+	def InitializePhysics(self):
+		connect(self.mode)
+		if self.mode == GUI:
 			resetDebugVisualizerCamera(1, 0, -40, [0.5, 0, 0])
 		configureDebugVisualizer(COV_ENABLE_RGB_BUFFER_PREVIEW, 0)
 		configureDebugVisualizer(COV_ENABLE_DEPTH_BUFFER_PREVIEW, 0)
@@ -32,6 +33,8 @@ class Engine:
 	def AddPlugin(self, plugin):
 		self.plugins += [plugin]
 	def AddComponent(self, component):
+		if component is None:
+			return
 		for plugin in self.plugins:
 			plugin.OnAddComponent(component)
 		component.Create()
@@ -59,7 +62,8 @@ class Engine:
 						plugin.OnUpdateRecord()
 				for plugin in self.plugins:
 					plugin.OnAfterStep()
-			time.sleep(self.time_step)
+			if self.mode == GUI:
+				time.sleep(self.time_step)
 		for plugin in self.plugins:
 			plugin.OnTerminate()
 		disconnect()

@@ -263,35 +263,8 @@ class FastPropagationTest(ComponentTest):
 				self.component['line'].EndId()],
 			[self.component['tail'].EndId(), self.component['line'].EndId()]]
 
-def GetFastPropagationTest():
-	test = Component()
-	test.children = {
-		'trigger': EdgeTrigger([0, -SZ * 10], math.pi / 2),
-		'line1': LineDomino([0, -SZ * 10], [0, 0], (False, False)),
-		'fast': FastPropagation([0, 0], [SZ * 30, 0]),
-		'line2': LineDomino([SZ * 30, -SX], [SZ * 30, 1], (False, True))}
-	return test
-
-def GetSquareTest():
-	test = Component()
-	test.children['trigger'] = EdgeTrigger([-SZ * 10, 0], 0)
-	test.children['line'] = LineDomino([-SZ * 10, 0], [0, 0], (False, False))
-	for i in range(10):
-		x = i * SZ / LineDomino.INTERVAL_RATIO * 2
-		test.children['side' + str(i)] = SideBranch([x, 0], 0)
-		test.children['line' +str(i)] = LineDomino([x, SZ], [x, SZ * 10], (True, True))
-		test.children['gap' + str(i)] = SingleDomino([x + SZ / LineDomino.INTERVAL_RATIO, 0, SZ / 2], 'xyz')
-	return test
-
 if __name__ == '__main__':
-	test_classes = [
-		LineDominoTest,
-		UTurnTest,
-		AndGateTest,
-		CrossingTest,
-		SideBranchTest,
-		FastPropagationTest][: : -1]
-	for test_class in test_classes:
+	for test_class in ComponentTest.__subclasses__():
 		for arguments in test_class.GenerateArguments():
 			test = test_class(arguments)
 			print(test.name, test.arguments)

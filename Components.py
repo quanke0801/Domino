@@ -12,6 +12,8 @@ class Component:
 	def __init__(self, xyz = [0, 0, 0], rpy = [0, 0, 0]):
 		(self.translation, self.rotation) = (xyz, getQuaternionFromEuler(rpy))
 		self.children = {}
+		# self.input = []
+		# self.output = []
 		self.created = False
 	def Create(self, base_translation = [0, 0, 0], base_rotation = [0, 0, 0, 1]):
 		if self.created:
@@ -98,6 +100,51 @@ class LineDomino(Component):
 	def EndId(self):
 		return self.children[len(self.children) - 1].Id()
 
+class CurveDomino(Component):
+	SAMPLE_COUNT = 100
+	CONTROL_STRETCH = 1
+	INTERVAL_RATIO = 2
+	def __init__(self, start_xy, start_angle, end_xy, end_angle):
+		Component.__init__(self, [0, 0, 0], [0, 0, 0])
+		start_stretch = [
+			start_xy[0] + CurveDomino.CONTROL_STRETCH * math.cos(start_angle),
+			start_xy[1] + CurveDomino.CONTROL_STRETCH * math.sin(start_angle)]
+		end_stretch = [
+			end_xy[0] - CurveDomino.CONTROL_STRETCH * math.cos(end_angle),
+			end_xy[1] - CurveDomino.CONTROL_STRETCH * math.sin(end_angle)]
+		curve = self.GetBizierCurve([start_xy, start_stretch, end_stretch, end_xy])
+		curve += [self.Interpolate(end_xy, end_stretch, -1)]
+		angle = [self.Angle(curve[i], curve[i + 1]) for i in range(len(curve) - 1)] + [end_angle]
+		length = [self.Distance(curve[i], curve[i + 1]) for i in range(len(curve) - 1)]
+		total_length = sum(length)
+		N = total_length / (SZ / CurveDomino.INTERVAL_RATIO)
+		interval = total_length / N
+		self.children[0] = SingleDomino([start_xy[0], start_xy[1], SZ / 2], [0, 0, start_angle])
+		L = 0
+		for i in range(len(curve) - 1):
+			L += length[i]
+			if L >= interval:
+				L -= interval
+				t = L / interval
+				xy = self.Interpolate(curve[i], curve[i + 1], t)
+				a = angle[i] * t + angle[i + 1] * (1 - t)
+				self.children[len(self.children)] = SingleDomino([xy[0], xy[1], SZ / 2], [0, 0, a])
+	def GetBizierCurve(self, points):
+		curve = []
+		for i in range(CurveDomino.SAMPLE_COUNT + 1):
+			interpolated = points
+			while len(interpolated) > 1:
+				t = 1 - i / CurveDomino.SAMPLE_COUNT
+				interpolated = [self.Interpolate(interpolated[j], interpolated[j + 1], t) for j in range(len(interpolated) - 1)]
+			curve += interpolated
+		return curve
+	def Interpolate(self, point1, point2, t):
+		return [point1[0] * t + point2[0] * (1 - t), point1[1] * t + point2[1] * (1 - t)]
+	def Angle(self, point1, point2):
+		return math.atan2(point2[1] - point1[1], point2[0] - point1[0])
+	def Distance(self, point1, point2):
+		return ((point1[0] - point2[0]) ** 2 + (point1[1] - point2[1]) ** 2) ** 0.5
+
 class LeanTrigger(Component):
 	# Initially place it with angle = math.atan(SX / SZ) + LEAN_ANGLE.
 	# (so that it's unstable and will begin to fall when simulation starts)
@@ -126,6 +173,15 @@ class SideBranch(Component):
 		self.children['trigger'] = SingleDomino([0, SZ / 2 + SX * (0.5 - SideBranch.CONTACT_RATIO), SX + SZ / 2], 'yxz')
 		self.children['connection'] = SingleDomino([0, 0, SX + SZ / 2], 'xyz')
 		self.children['cover'] = SingleDomino([0, SX, SX * 1.5 + SZ], 'zxy')
+
+class MultiBranch(Component):
+	def __init__(self, N, xy = [0, 0], angle = 0, gap = SX):
+		Component.__init__(self, [xy[0], xy[1], 0], [0, 0, angle])
+		for i in range(N):
+			x = SZ / LineDomino.INTERVAL_RATIO * i
+			for j in range(0, i + 1):
+				y = (i / 2 - j) * (gap + SY)
+				self.children[str(i) + '_' + str(j)] = SingleDomino([x, y, SZ / 2], 'xyz')
 
 class UTurn(Component):
 	def __init__(self, xy = [0, 0], angle = 0):
@@ -159,6 +215,20 @@ class Crossing(Component):
 		self.children['triggerR'] = SingleDomino([trigger_x, 0, SX + SZ / 2], 'xyz')
 		self.children['triggerL'] = SingleDomino([-trigger_x, 0, SX + SZ / 2], 'xyz')
 		self.children['bridge'] = SingleDomino([0, 0, SX + SZ / 2], 'yxz')
+
+class ConditionGate(Component):
+	def __init__(self, xy = [0, 0], angle = 0):
+		Component.__init__(self, [xy[0], xy[1], 0], [0, 0, angle])
+		self.children['base'] = PileDomino(5, [SY / 2 + SX - SZ / 2, 0], 0)
+		self.children['connection'] = SingleDomino([-SY - SX / 2, 0, SX * 5.5], 'zxy')
+		self.children['condition'] = SingleDomino([-SY * 1.5 - SX, 0, SZ / 2], 'xyz')
+		self.children['portL'] = SingleDomino([0, SZ / 2 + SX, SZ / 2], 'yxz')
+		self.children['portR'] = SingleDomino([0, -SZ / 2 - SX, SZ / 2], 'yxz')
+		(x, y) = (-SY / 2 - SX, SY / 2 + SZ / 2)
+		self.children['barrierL1'] = SingleDomino([SY / 2 + SX / 2, SY, SZ / 2], 'xyz')
+		self.children['barrierL2'] = LineDomino([x, y], [x - SX * 2, y], interval = SX, side = True)
+		self.children['barrierR1'] = SingleDomino([SY / 2 + SX / 2, -SY, SZ / 2], 'xyz')
+		self.children['barrierR2'] = LineDomino([x, -y], [x - SX * 2, -y], interval = SX, side = True)
 
 class OrGate(Component):
 	def __init__(self, xy = [0, 0], angle = 0):

@@ -51,7 +51,7 @@ class LineDominoTest(ComponentTest):
 	def GenerateComponent(self):
 		component = Component()
 		component.children = {
-			'trigger': LeanTrigger([0, 0], 0),
+			'trigger': LeanTrigger(([0, 0], 0)),
 			'line': LineDomino([0, 0], [SZ * 10, 0], (False, True), side = self.arguments['side'])}
 		return component
 	def GenerateSequences(self):
@@ -70,15 +70,15 @@ class UTurnTest(ComponentTest):
 		ComponentTest.__init__(self, 'UTurnTest', arguments)
 	def GenerateComponent(self):
 		component = Component()
-		component.children['trigger'] = LeanTrigger([0, 0], 0)
+		component['trigger'] = LeanTrigger(([0, 0], 0))
 		for i in range(self.arguments['N']):
 			y = SZ * i
 			if i % 2 == 0:
-				component.children['line' + str(i)] = LineDomino([0, y], [SZ * 10, y], (False, False))
-				component.children['uturn' + str(i)] = UTurn([SZ * 10, y + SZ / 2], 0)
+				component['line' + str(i)] = LineDomino([0, y], [SZ * 10, y], (False, False))
+				component['uturn' + str(i)] = UTurn(([SZ * 10, y + SZ / 2], 0))
 			else:
-				component.children['line' + str(i)] = LineDomino([SZ * 10, y], [0, y], (False, False))
-				component.children['uturn' + str(i)] = UTurn([0, y + SZ / 2], math.pi)
+				component['line' + str(i)] = LineDomino([SZ * 10, y], [0, y], (False, False))
+				component['uturn' + str(i)] = UTurn(([0, y + SZ / 2], math.pi))
 		return component
 	def GenerateSequences(self):
 		sequence = [self.component['trigger'].Id()]
@@ -103,15 +103,15 @@ class AndGateTest(ComponentTest):
 		ComponentTest.__init__(self, 'AndGateTest', arguments)
 	def GenerateComponent(self):
 		component = Component()
-		component.children['and'] = AndGate([0, 0], 0)
+		component['and'] = AndGate(([0, 0], 0))
 		L = [SZ * 10, SZ * 20] if self.arguments['order12'] else [SZ * 20, SZ * 10]
-		component.children['in1'] = LineDomino([0, L[0]], [0, 0], (False, False))
-		component.children['in2'] = LineDomino([L[1], 0], [SZ, 0], (False, False))
+		component['in1'] = LineDomino([0, L[0]], [0, 0], (False, False))
+		component['in2'] = LineDomino([L[1], 0], [SZ, 0], (False, False))
 		if self.arguments['exist'][0]:
-			component.children['trigger1'] = LeanTrigger([0, L[0]], -math.pi / 2)
+			component['trigger1'] = LeanTrigger(([0, L[0]], -math.pi / 2))
 		if self.arguments['exist'][1]:
-			component.children['trigger2'] = LeanTrigger([L[1], 0], -math.pi)
-		component.children['out'] = LineDomino([-SZ / 2, 0], [-SZ * 10, 0], (True, True))
+			component['trigger2'] = LeanTrigger(([L[1], 0], -math.pi))
+		component['out'] = LineDomino([-SZ / 2, 0], [-SZ * 10, 0], (True, True))
 		return component
 	def GenerateSequences(self):
 		sequences = []
@@ -166,12 +166,12 @@ class CrossingTest(ComponentTest):
 		component = Component()
 		L = [SZ * 10, SZ * 20] if self.arguments['order12'] else [SZ * 20, SZ * 10]
 		component.children = {
-			'crossing': Crossing([0, 0], 0),
+			'crossing': Crossing(([0, 0], 0)),
 			'in1': LineDomino([-L[0], 0], [-SZ * 1.5, 0], (False, False)),
-			'trigger1': LeanTrigger([-L[0], 0], 0),
+			'trigger1': LeanTrigger(([-L[0], 0], 0)),
 			'out1': LineDomino([SZ * 1.5, 0], [SZ * 10, 0], (False, True)),
 			'in2': LineDomino([0, L[1]], [0, 0], (False, False)),
-			'trigger2': LeanTrigger([0, L[1]], -math.pi / 2),
+			'trigger2': LeanTrigger(([0, L[1]], -math.pi / 2)),
 			'out2': LineDomino([0, 0], [0, -SZ * 10], (False, True))}
 		return component
 	def GenerateSequences(self):
@@ -203,13 +203,13 @@ class SideBranchTest(ComponentTest):
 		ComponentTest.__init__(self, 'SideBranchTest', arguments)
 	def GenerateComponent(self):
 		component = Component()
-		component.children['trigger'] = LeanTrigger([0, 0], 0)
+		component['trigger'] = LeanTrigger(([0, 0], 0))
 		x = 0
 		for i in range(self.arguments['N']):
 			next_x = x + SZ * 5
-			component.children['gap' + str(i)] = LineDomino([x, 0], [next_x, 0], (False, False))
-			component.children['side' + str(i)] = SideBranch([next_x, 0], 0)
-			component.children['line' + str(i)] = LineDomino([next_x, SZ], [next_x, SZ * 10], (True, True))
+			component['gap' + str(i)] = LineDomino([x, 0], [next_x, 0], (False, False))
+			component['side' + str(i)] = SideBranch(([next_x, 0], 0))
+			component['line' + str(i)] = LineDomino([next_x, SZ], [next_x, SZ * 10], (True, True))
 			x = next_x
 		return component
 	def GenerateSequences(self):
@@ -239,12 +239,12 @@ class FastPropagationTest(ComponentTest):
 	def GenerateComponent(self):
 		component = Component()
 		(L, y) = (SZ * 10, -SZ * 2)
-		component.children['trigger1'] = LeanTrigger([0, L], -math.pi / 2)
-		component.children['head'] = LineDomino([0, L], [0, 0], (False, False))
-		component.children['fast'] = FastPropagation([0, 0], [L * 3, 0])
-		component.children['tail'] = LineDomino([L * 3, -SX], [L * 3, L], (False, True))
-		component.children['trigger2'] = LeanTrigger([-L, y], 0)
-		component.children['line'] = LineDomino([-L, y], [L * 4, y], (False, True))
+		component['trigger1'] = LeanTrigger(([0, L], -math.pi / 2))
+		component['head'] = LineDomino([0, L], [0, 0], (False, False))
+		component['fast'] = FastPropagation([0, 0], [L * 3, 0])
+		component['tail'] = LineDomino([L * 3, -SX], [L * 3, L], (False, True))
+		component['trigger2'] = LeanTrigger(([-L, y], 0))
+		component['line'] = LineDomino([-L, y], [L * 4, y], (False, True))
 		return component
 	def GenerateSequences(self):
 		return [

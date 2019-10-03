@@ -53,8 +53,10 @@ class Component:
 		return ((parent_x, parent_y), parent_angle)
 	def __call__(self, child_name, port_name):
 		return self.children[child_name].Promote(port_name)
-	def Connect(self, child1, port1, child2, port2, radius = 1):
-		return CurveDomino(self.children[child1].Promote(port1), self.children[child2].Promote(port2), radius)
+	def Connect(self, child1, port1, child2, port2, name = None):
+		if name is None:
+			name = '%s_%s_to_%s_%s' % (child1, port1, child2, port2)
+		self.children[name] = CurveDomino(self.children[child1].Promote(port1), self.children[child2].Promote(port2))
 
 class SingleDomino(Component):
 	INTERVAL_RATIO = 1.8
@@ -65,11 +67,12 @@ class SingleDomino(Component):
 		'yzx': [math.pi / 2, 0, math.pi / 2],
 		'zxy': [0, math.pi / 2, math.pi / 2],
 		'zyx': [0, math.pi / 2, 0]}
-	def __init__(self, pose = ([0, 0, 0], [0, 0, 0])):
+	def __init__(self, pose = ([0, 0, 0], [0, 0, 0]), dynamics = {}):
 		(xyz, rpy) = pose
 		if type(rpy) == str:
 			rpy = SingleDomino.ORIENTATION_ALIAS[rpy]
 		Component.__init__(self, (xyz, rpy))
+		self.dynamics = dynamics
 		self.body_id = -1
 	def Create(self, base_pose = ([0, 0, 0], [0, 0, 0, 1])):
 		if self.created:
@@ -79,17 +82,28 @@ class SingleDomino(Component):
 		self.body_id = createCollisionShape(
 			GEOM_BOX,
 			halfExtents = [S / 2 for S in DOMINO_SIZE])
-		changeDynamics(self.body_id, -1, lateralFriction = 0.35, restitution = 0)
 		createMultiBody(
 			DOMINO_MASS,
 			self.body_id,
 			basePosition = now_pose[0],
 			baseOrientation = now_pose[1])
+		changeDynamics(
+			self.body_id,
+			-1,
+			lateralFriction = self.dynamics.get('friction', 0.5),
+			restitution = self.dynamics.get('restitution', 0))
 		self.created = True
 	def Id(self):
 		return self.body_id if self.created else -1
 	def AllIds(self):
 		return [self.body_id]
+
+class TargetDomino(Component):
+	def __init__(self, pose = ([0, 0], 0)):
+		(xy, angle) = pose
+		Component.__init__(self, ([xy[0], xy[1], 0], [0, 0, angle]))
+		self.children['target'] = SingleDomino(([0, 0, SZ / 2], [0, 0, 0]))
+		self.port['in'] = ([-SY, 0], 0)
 
 class PileDomino(Component):
 	def __init__(self, N, pose):
@@ -130,20 +144,12 @@ class LineDomino(Component):
 
 class CurveDomino(Component):
 	SAMPLE_COUNT = 100
-	INTERVAL_RATIO = 2
-	def __init__(self, start_pose, end_pose, radius = 1, interval = -1):
-		(start_xy, start_angle) = start_pose
-		(end_xy, end_angle) = end_pose
+	INTERVAL_RATIO = 1.8
+	def __init__(self, start_pose, end_pose, interval = -1):
 		Component.__init__(self, ([0, 0, 0], [0, 0, 0]))
-		start_extend = [
-			start_xy[0] + radius * math.cos(start_angle),
-			start_xy[1] + radius * math.sin(start_angle)]
-		end_extend = [
-			end_xy[0] - radius * math.cos(end_angle),
-			end_xy[1] - radius * math.sin(end_angle)]
-		curve = self.GetBizierCurve([start_xy, start_extend, end_extend, end_xy])
-		curve += [self.Interpolate(end_extend, end_xy, -1)]
-		angle = [self.Angle(curve[i], curve[i + 1]) for i in range(len(curve) - 1)] + [end_angle]
+		(radius, curve) = self.SearchMinCurvature(start_pose, end_pose)
+		curve += [self.Interpolate(curve[-2], curve[-1], -1)]
+		angle = [self.Angle(curve[i], curve[i + 1]) for i in range(len(curve) - 1)] + [end_pose[1]]
 		length = [self.Distance(curve[i], curve[i + 1]) for i in range(len(curve) - 1)] + [radius]
 		total_length = sum(length[: -2])
 		if interval < 0:
@@ -160,6 +166,33 @@ class CurveDomino(Component):
 			xy = self.Interpolate(curve[ci], curve[ci + 1], t)
 			a = angle[ci] * t + angle[ci + 1] * (1 - t)
 			self.children[i] = SingleDomino(([xy[0], xy[1], SZ / 2], [0, 0, a]))
+	def SearchMinCurvature(self, start_pose, end_pose, lower = 0, upper = 1):
+		DIVIDE = 5
+		search_radius = [lower + (upper - lower) / (DIVIDE - 1) * i for i in range(DIVIDE)]
+		curves = []
+		curvatures = []
+		for (i, radius) in enumerate(search_radius):
+			(start_xy, start_angle) = start_pose
+			(end_xy, end_angle) = end_pose
+			start_extend = [
+				start_xy[0] + radius * math.cos(start_angle),
+				start_xy[1] + radius * math.sin(start_angle)]
+			end_extend = [
+				end_xy[0] - radius * math.cos(end_angle),
+				end_xy[1] - radius * math.sin(end_angle)]
+			curve = self.GetBizierCurve([start_xy, start_extend, end_extend, end_xy])
+			curves += [curve]
+			curve = [self.Interpolate(start_xy, start_extend, 1 + 1.0E-2)] + curve + [self.Interpolate(end_xy, end_extend, 1 + 1.0E-2)]
+			max_curvature = max([self.Curvature([curve[i], curve[i + 1], curve[i + 2]]) for i in range(len(curve) - 2)])
+			curvatures += [max_curvature]
+		index = curvatures.index(min(curvatures))
+		if index != 0:
+			lower = search_radius[index - 1]
+		if index != DIVIDE - 1:
+			upper = search_radius[index + 1]
+		if upper - lower < 0.05:
+			return ((lower + upper) / 2, curves[index])
+		return self.SearchMinCurvature(start_pose, end_pose, lower, upper)
 	def GetBizierCurve(self, points):
 		curve = []
 		for i in range(CurveDomino.SAMPLE_COUNT + 1):
@@ -171,10 +204,21 @@ class CurveDomino(Component):
 		return curve
 	def Interpolate(self, point1, point2, t):
 		return [point1[0] * t + point2[0] * (1 - t), point1[1] * t + point2[1] * (1 - t)]
+	def Curvature(self, points):
+		lengths = [self.Distance(points[i], points[(i + 1) % 3]) for i in range(3)]
+		if lengths[0] * lengths[1] * lengths[2] == 0:
+			return 1.0E100
+		s = sum(lengths) / 2
+		area = max(0, s * (s - lengths[0]) * (s - lengths[1]) * (s - lengths[2])) ** 0.5
+		return area * 4 / lengths[0] / lengths[1] / lengths[2]
 	def Angle(self, point1, point2):
 		return math.atan2(point2[1] - point1[1], point2[0] - point1[0])
 	def Distance(self, point1, point2):
 		return ((point1[0] - point2[0]) ** 2 + (point1[1] - point2[1]) ** 2) ** 0.5
+	def StartId(self):
+		return self.children[0].Id()
+	def EndId(self):
+		return self.children[len(self.children) - 1].Id()
 
 class LeanTrigger(Component):
 	# Initially place it with angle = math.atan(SX / SZ) + LEAN_ANGLE.
@@ -198,6 +242,21 @@ class EdgeTrigger(Component):
 		self.children['trigger'] = SingleDomino(([SX * (0.5 - EdgeTrigger.CONTACT_RATIO), 0, SX + SZ / 2], 'xyz'))
 		self.port['out'] = ([SY, 0], 0)
 
+class TapButton(Component):
+	# Initially only CONTACT_RATIO * SX part will stand on the base.
+	# (should be stable a.k.a larger than 0.5)
+	CONTACT_RATIO = 0.9
+	def __init__(self, pose = ([0, 0], 0)):
+		(xy, angle) = pose
+		Component.__init__(self, ([xy[0], xy[1], 0], [0, 0, angle]))
+		self.children['base'] = SingleDomino(([0, 0, SX / 2], 'zyx'))
+		self.children['lever'] = SingleDomino(([-SZ / 2, 0, SX * 1.5], 'zyx'))
+		self.children['support'] = SingleDomino(([SY / 2, 0, SX * 1.5], 'zxy'))
+		self.children['cover'] = SingleDomino(([0, 0, SX * 2.5], 'zyx'))
+		self.children['trigger'] = SingleDomino(([SY + SX * (0.5 - TapButton.CONTACT_RATIO), 0, SZ / 2 + SX * 3], 'xyz'))
+		self.port['in'] = ([-SY - SZ, 0], 0)
+		self.port['out'] = ([SY * 2, 0], 0)
+
 class SideBranch(Component):
 	# Initially only CONTACT_RATIO * SX part will stand on the base.
 	# (should be unstable a.k.a less than 0.5)
@@ -209,10 +268,10 @@ class SideBranch(Component):
 		self.children['trigger'] = SingleDomino(([0, SZ / 2 + SX * (0.5 - SideBranch.CONTACT_RATIO), SX + SZ / 2], 'yxz'))
 		self.children['connection'] = SingleDomino(([0, 0, SX + SZ / 2], 'xyz'))
 		self.children['cover'] = SingleDomino(([0, SX, SX * 1.5 + SZ], 'zxy'))
-		self.port['inD'] = ([-SY, 0], 0)
-		self.port['outD'] = ([-SY, 0], math.pi)
-		self.port['inU'] = ([SY, 0], math.pi)
-		self.port['outU'] = ([SY, 0], 0)
+		self.port['inL'] = ([-SY, 0], 0)
+		self.port['outL'] = ([-SY, 0], math.pi)
+		self.port['inR'] = ([SY, 0], math.pi)
+		self.port['outR'] = ([SY, 0], 0)
 		self.port['branch'] = ([0, SZ / 2 + SY], math.pi / 2)
 
 class MultiBranch(Component):
@@ -266,11 +325,14 @@ class Crossing(Component):
 		self.children['triggerR'] = SingleDomino(([trigger_x, 0, SX + SZ / 2], 'xyz'))
 		self.children['triggerL'] = SingleDomino(([-trigger_x, 0, SX + SZ / 2], 'xyz'))
 		self.children['bridge'] = SingleDomino(([0, 0, SX + SZ / 2], 'yxz'))
-		self.port = {
-			'inL': ([-trigger_x - SY], 0), 'outL': ((-trigger_x - SY), math.pi),
-			'inR': ([trigger_x + SY], math.pi), 'outR': ((trigger_x + SY), 0),
-			'inD': ([0, -SY], math.pi / 2), 'outD': ((0, -SY), -math.pi / 2),
-			'inU': ([0, SY], -math.pi / 2), 'outU': ((0, SY), math.pi / 2)}
+		self.port['inL'] = ([-trigger_x - SY, 0], 0)
+		self.port['outL'] = ([-trigger_x - SY, 0], math.pi)
+		self.port['inR'] = ([trigger_x + SY, 0], math.pi)
+		self.port['outR'] = ([trigger_x + SY, 0], 0)
+		self.port['inD'] = ([0, -SY], math.pi / 2)
+		self.port['outD'] = ([0, -SY], -math.pi / 2)
+		self.port['inU'] = ([0, SY], -math.pi / 2)
+		self.port['outU'] = ([0, SY], math.pi / 2)
 
 class ConditionGate(Component):
 	def __init__(self, pose = ([0, 0], 0)):
@@ -285,10 +347,11 @@ class ConditionGate(Component):
 		self.children['barrierRD'] = SingleDomino(([SY, -SY / 2 - SX / 2, SZ / 2], 'yxz'))
 		self.children['barrierLU'] = SingleDomino(([-SY / 2 - SZ / 2, SZ - SY / 2 - SX * 1.5, SY / 2], 'yzx'))
 		self.children['barrierRU'] = SingleDomino(([SY / 2 + SZ / 2, SZ - SY / 2 - SX * 1.5, SY / 2], 'yzx'))
-		self.port = {
-			'inL': ([-SZ - SX, 0], 0), 'outL': ((-SZ - SX, 0), math.pi),
-			'inR': ([SZ + SX, 0], math.pi), 'outR': ((SZ + SX, 0), 0),
-			'inU': ([0, SY * 2 + SX], -math.pi / 2)}
+		self.port['inL'] = ([-SZ - SX, 0], 0)
+		self.port['outL'] = ((-SZ - SX, 0), math.pi)
+		self.port['inR'] = ([SZ + SX, 0], math.pi)
+		self.port['outR'] = ((SZ + SX, 0), 0)
+		self.port['inU'] = ([0, SY * 2 + SX], -math.pi / 2)
 
 class OrGate(Component):
 	def __init__(self, pose = ([0, 0], 0)):

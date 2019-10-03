@@ -20,16 +20,20 @@ class Engine:
 		self.InitializePhysics()
 	def InitializePhysics(self):
 		connect(self.mode)
-		if self.mode == GUI:
-			resetDebugVisualizerCamera(1, 0, -40, [0.5, 0, 0])
 		configureDebugVisualizer(COV_ENABLE_RGB_BUFFER_PREVIEW, 0)
 		configureDebugVisualizer(COV_ENABLE_DEPTH_BUFFER_PREVIEW, 0)
 		configureDebugVisualizer(COV_ENABLE_SEGMENTATION_MARK_PREVIEW, 0)
 		setGravity(0, 0, -10)
 		setTimeStep(self.time_step)
-		ground = createCollisionShape(GEOM_PLANE)
-		changeDynamics(ground, -1, lateralFriction = 0.5, restitution = 0.1)
-		createMultiBody(0, ground)
+		ground_id = createCollisionShape(GEOM_PLANE)
+		createMultiBody(0, ground_id)
+		changeDynamics(ground_id, -1, lateralFriction = 0.5, restitution = 0.1)
+		if self.mode == GUI:
+			resetDebugVisualizerCamera(2, 0, -40, [0.5, 0, 0])
+			ground_texture_id = loadTexture('ground.jpg')
+			changeVisualShape(ground_id, -1, -1, ground_texture_id)
+		#print(getPhysicsEngineParameters())
+		setPhysicsEngineParameter(numSolverIterations = 50)
 	def AddPlugin(self, plugin):
 		self.plugins += [plugin]
 	def AddComponent(self, component):
@@ -48,12 +52,14 @@ class Engine:
 		self.record.Initialize()
 		for plugin in self.plugins:
 			plugin.OnStart()
+		last_time = time.time()
 		while not self.terminate:
 			for plugin in self.plugins:
 				plugin.OnIdle()
 			if not self.paused:
 				for plugin in self.plugins:
 					plugin.OnBeforeStep()
+				last_time = time.time()
 				stepSimulation()
 				self.elapsed += self.time_step
 				self.record.Update()
@@ -63,7 +69,9 @@ class Engine:
 				for plugin in self.plugins:
 					plugin.OnAfterStep()
 			if self.mode == GUI:
-				time.sleep(self.time_step)
+				until_next = self.time_step - (time.time() - last_time)
+				if until_next > 0:
+					time.sleep(self.time_step)
 		for plugin in self.plugins:
 			plugin.OnTerminate()
 		disconnect()

@@ -24,7 +24,7 @@ class ComponentTest:
 	def GenerateStatics(self):
 		return []
 	def Run(self):
-		engine = Engine(0.001, DIRECT)
+		engine = Engine(0.001, GUI)
 		engine.AddComponent(self.component)
 		sequences = self.GenerateSequences()
 		statics = self.GenerateStatics()
@@ -59,6 +59,64 @@ class LineDominoTest(ComponentTest):
 			self.component['trigger'].Id(),
 			self.component['line'].StartId(),
 			self.component['line'].EndId()]]
+
+class CurveDominoTest(ComponentTest):
+	DEFAULT_ARGUMENTS = {
+		'end_pose': ([SZ * 10, 0], 0)}
+	@classmethod
+	def GenerateArguments(cls):
+		return [
+			{'end_pose': ([SZ * 10, 0], 0)},
+			{'end_pose': ([SZ * 10, SZ * 5], 0)},
+			{'end_pose': ([SZ * 10, SZ * 5], math.pi / 4)}]
+	def __init__(self, arguments = {}):
+		ComponentTest.__init__(self, 'LineDominoTest', arguments)
+	def GenerateComponent(self):
+		component = Component()
+		component['trigger'] = LeanTrigger(([0, 0], 0))
+		component['curve'] = CurveDomino(component('trigger', 'out'), self.arguments['end_pose'])
+		return component
+	def GenerateSequences(self):
+		sequence = []
+		for i in range(len(self.component.children)):
+			sequence += [self.component['curve'][i].Id()]
+		return [sequence]
+
+class SideBranchTest(ComponentTest):
+	DEFAULT_ARGUMENTS = {
+		'N': 2}
+	@classmethod
+	def GenerateArguments(cls):
+		return [{'N': 2}, {'N': 3}]
+	def __init__(self, arguments):
+		ComponentTest.__init__(self, 'SideBranchTest', arguments)
+	def GenerateComponent(self):
+		component = Component()
+		component['trigger'] = LeanTrigger(([0, 0], 0))
+		x = [(i + 1) * SZ * 5 for i in range(self.arguments['N'])]
+		for i in range(self.arguments['N']):
+			component['side' + str(i)] = SideBranch(([x[i], 0], 0))
+		for i in range(self.arguments['N']):
+			(last_child, last_port) = ('trigger', 'out') if i == 0 else ('side' + str(i - 1), 'outR')
+			component['curve' + str(i)] = CurveDomino(component(last_child, last_port), component('side' + str(i), 'inL'))
+			component['out' + str(i)] = CurveDomino(component('side' + str(i), 'branch'), ([x[i], SZ * 5], math.pi / 2))
+		return component
+	def GenerateSequences(self):
+		sequences = []
+		main_sequence = [self.component['trigger'].Id()]
+		for i in range(self.arguments['N']):
+			main_sequence += [
+				self.component['curve' + str(i)].StartId(),
+				self.component['curve' + str(i)].EndId(),
+				self.component['side' + str(i)]['connection'].Id()]
+		sequences += [main_sequence]
+		for i in range(self.arguments['N']):
+			sequences += [[
+				self.component['side' + str(i)]['connection'].Id(),
+				self.component['side' + str(i)]['trigger'].Id(),
+				self.component['out' + str(i)].StartId(),
+				self.component['out' + str(i)].EndId()]]
+		return sequences
 
 class UTurnTest(ComponentTest):
 	DEFAULT_ARGUMENTS = {
@@ -193,42 +251,6 @@ class CrossingTest(ComponentTest):
 			self.component['out2'].EndId()]]
 		return sequences
 
-class SideBranchTest(ComponentTest):
-	DEFAULT_ARGUMENTS = {
-		'N': 2}
-	@classmethod
-	def GenerateArguments(cls):
-		return [{'N': 2}, {'N': 3}]
-	def __init__(self, arguments):
-		ComponentTest.__init__(self, 'SideBranchTest', arguments)
-	def GenerateComponent(self):
-		component = Component()
-		component['trigger'] = LeanTrigger(([0, 0], 0))
-		x = 0
-		for i in range(self.arguments['N']):
-			next_x = x + SZ * 5
-			component['gap' + str(i)] = LineDomino([x, 0], [next_x, 0], (False, False))
-			component['side' + str(i)] = SideBranch(([next_x, 0], 0))
-			component['line' + str(i)] = LineDomino([next_x, SZ], [next_x, SZ * 10], (True, True))
-			x = next_x
-		return component
-	def GenerateSequences(self):
-		sequences = []
-		main_sequence = [self.component['trigger'].Id()]
-		for i in range(self.arguments['N']):
-			main_sequence += [
-				self.component['gap' + str(i)].StartId(),
-				self.component['gap' + str(i)].EndId(),
-				self.component['side' + str(i)]['connection'].Id()]
-		sequences += [main_sequence]
-		for i in range(self.arguments['N']):
-			sequences += [[
-				self.component['side' + str(i)]['connection'].Id(),
-				self.component['side' + str(i)]['trigger'].Id(),
-				self.component['line' + str(i)].StartId(),
-				self.component['line' + str(i)].EndId()]]
-		return sequences
-
 class FastPropagationTest(ComponentTest):
 	DEFAULT_ARGUMENTS = {}
 	@classmethod
@@ -263,9 +285,13 @@ class FastPropagationTest(ComponentTest):
 				self.component['line'].EndId()],
 			[self.component['tail'].EndId(), self.component['line'].EndId()]]
 
-if __name__ == '__main__':
+def TestAll():
 	for test_class in ComponentTest.__subclasses__():
 		for arguments in test_class.GenerateArguments():
 			test = test_class(arguments)
 			print(test.name, test.arguments)
 			test.Run()
+
+if __name__ == '__main__':
+	TestAll()
+	#CurveDominoTest({'end_pose': ([SZ * 10, SZ * 5], math.pi / 4)}).Run()

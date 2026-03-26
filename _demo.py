@@ -1,10 +1,12 @@
+import time
 from pathlib import Path
 
 import mujoco
+import mujoco.viewer
 from PIL import Image
 
 
-OUTPUT_DIR = Path(r"d:\Code\BulletDomino\MujocoDomino\frames")
+OUTPUT_DIR = Path(r"frames")
 FRAME_WIDTH = 1280
 FRAME_HEIGHT = 720
 FPS = 60
@@ -63,31 +65,73 @@ def build_domino_scene_xml(
 """
 
 
-def main() -> None:
-    xml = build_domino_scene_xml()
-    model = mujoco.MjModel.from_xml_string(xml)
-    data = mujoco.MjData(model)
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-
-    camera = mujoco.MjvCamera()
+def configure_camera(camera: mujoco.MjvCamera) -> None:
     camera.azimuth = 90
     camera.elevation = -20
     camera.distance = 0.7
     camera.lookat[:] = [0.35, 0.0, 0.05]
 
-    renderer = mujoco.Renderer(model, height=FRAME_HEIGHT, width=FRAME_WIDTH)
+
+def main(gui: bool = True, dump_folder: Path | str | None = None) -> None:
+    xml = build_domino_scene_xml()
+    model = mujoco.MjModel.from_xml_string(xml)
+    data = mujoco.MjData(model)
     frame_count = int(FPS * DURATION_SECONDS)
+    dump_path = Path(dump_folder) if dump_folder is not None else None
+    renderer = None
 
-    for frame_idx in range(frame_count):
-        target_time = (frame_idx + 1) / FPS
-        while data.time < target_time:
-            mujoco.mj_step(model, data)
+    if dump_path is not None:
+        dump_path.mkdir(parents=True, exist_ok=True)
+        renderer = mujoco.Renderer(model, height=FRAME_HEIGHT, width=FRAME_WIDTH)
 
-        renderer.update_scene(data, camera=camera)
-        rgb = renderer.render()
-        Image.fromarray(rgb).save(OUTPUT_DIR / f"{frame_idx}.png")
+    if gui:
+        with mujoco.viewer.launch_passive(model, data) as viewer:
+            configure_camera(viewer.cam)
+            next_dump_time = 1.0 / FPS
+            frame_idx = 0
 
-    renderer.close()
+            while viewer.is_running():
+                # In passive mode, the viewer toggles Simulate.run via keyboard
+                # controls (space pause/resume, backspace reset).
+                sim = viewer._get_sim()  # pylint: disable=protected-access
+                running = sim is None or bool(sim.run)
+
+                if running:
+                    step_start = time.perf_counter()
+                    mujoco.mj_step(model, data)
+
+                    if renderer is not None and dump_path is not None:
+                        while data.time >= next_dump_time:
+                            renderer.update_scene(data, camera=viewer.cam)
+                            rgb = renderer.render()
+                            Image.fromarray(rgb).save(dump_path / f"{frame_idx}.png")
+                            frame_idx += 1
+                            next_dump_time = (frame_idx + 1) / FPS
+
+                    sleep_time = model.opt.timestep - (time.perf_counter() - step_start)
+                    if sleep_time > 0:
+                        time.sleep(sleep_time)
+                else:
+                    mujoco.mj_forward(model, data)
+                    time.sleep(0.01)
+
+                viewer.sync()
+    else:
+        camera = mujoco.MjvCamera()
+        configure_camera(camera)
+
+        for frame_idx in range(frame_count):
+            target_time = (frame_idx + 1) / FPS
+            while data.time < target_time:
+                mujoco.mj_step(model, data)
+
+            if renderer is not None and dump_path is not None:
+                renderer.update_scene(data, camera=camera)
+                rgb = renderer.render()
+                Image.fromarray(rgb).save(dump_path / f"{frame_idx}.png")
+
+    if renderer is not None:
+        renderer.close()
 
 
 if __name__ == "__main__":

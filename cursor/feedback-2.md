@@ -1,0 +1,1 @@
+- what exactly should be the type of `coincide()`? how to put this function (is it a function even)? what should it return? and where should i resolve it?

@@ -2,7 +2,7 @@ import numpy as np
 
 from Domino.geometry.pose import Pose, rotation_matrix_from_axis_angle
 
-EPSILON = 1e-8
+CONTACT_EPSILON = 1e-8
 
 
 class OBB:
@@ -19,7 +19,7 @@ class OBB:
             for sign_y in [-1, 1]:
                 for sign_z in [-1, 1]:
                     sign_vector = np.array([sign_x, sign_y, sign_z])
-                    corner = self.pose * (sign_vector * self.half_extents)
+                    corner = self.pose.apply_point(sign_vector * self.half_extents)
                     corners.append(corner)
         return np.array(corners)
     
@@ -44,43 +44,44 @@ class SAT:
             for axis2 in obb2.axes():
                 axis = np.cross(axis1, axis2)
                 axis_length = np.linalg.norm(axis)
-                if axis_length < EPSILON:
+                if axis_length < CONTACT_EPSILON:
                     continue
                 separation_axes.append(axis / axis_length)
         return separation_axes
     
     @staticmethod
-    def slide_t(obb1: OBB, obb2: OBB, velocity1: np.ndarray) -> float | None:
+    def slide_distance(obb1: OBB, obb2: OBB, axis1: np.ndarray) -> float | None:
+        axis1 = axis1 / np.linalg.norm(axis1)
         # For each separation axis, compute the overlap interval.
-        t_first, t_last = -np.inf, np.inf
+        d_first, d_last = -np.inf, np.inf
         for separation_axis in SAT.generate_separation_axes(obb1, obb2):
-            # Compute initial properties: sum of radii, initial distance, and relative velocity.
+            # Compute initial properties: sum of radii, initial distance, and projected movement.
             sum_radius = obb1.radius_along_axis(separation_axis) + obb2.radius_along_axis(separation_axis)
             initial_distance = np.dot(obb2.pose.position - obb1.pose.position, separation_axis)
-            relative_velocity = -np.dot(velocity1, separation_axis)
+            projected_movement = -np.dot(axis1, separation_axis)
             # Determine overlapping interval.
-            if np.abs(relative_velocity) < EPSILON:
-                if np.abs(initial_distance) > sum_radius - EPSILON: # to avoid tangential slide
+            if np.abs(projected_movement) < CONTACT_EPSILON:
+                if np.abs(initial_distance) > sum_radius - CONTACT_EPSILON: # to avoid tangential slide
                     return None # Never will collide along this axis, can return early.
                 else:
-                    pass # No constraint on t_first/t_last along this axis.
+                    pass # No constraint on d_first/d_last along this axis.
             else:
                 # math: |d0 + v * t| <= r
-                t1 = (-sum_radius - initial_distance) / relative_velocity
-                t2 = (sum_radius - initial_distance) / relative_velocity
-                t_enter, t_exit = min(t1, t2), max(t1, t2)
-                t_first, t_last = max(t_first, t_enter), min(t_last, t_exit)
-                if t_first > t_last + EPSILON:
+                d1 = (-sum_radius - initial_distance) / projected_movement
+                d2 = (sum_radius - initial_distance) / projected_movement
+                d_enter, d_exit = min(d1, d2), max(d1, d2)
+                d_first, d_last = max(d_first, d_enter), min(d_last, d_exit)
+                if d_first > d_last + CONTACT_EPSILON:
                     return None # No overlap interval, can return early.
-        return t_first
+        return d_first
     
     @staticmethod
     def separation_distance(obb1: OBB, obb2: OBB) -> float | None:
         distance = -np.inf
         for separation_axis in SAT.generate_separation_axes(obb1, obb2):
             sum_radius = obb1.radius_along_axis(separation_axis) + obb2.radius_along_axis(separation_axis)
-            initial_distance = np.dot(obb2.pose.position - obb1.pose.position, separation_axis)
-            distance = max(distance, initial_distance - sum_radius)
+            separation_distance = np.dot(obb2.pose.position - obb1.pose.position, separation_axis) - sum_radius
+            distance = max(distance, separation_distance)
         return distance
     
     @staticmethod

@@ -29,12 +29,14 @@ class Pose:
     def set_rotation(self, rotation: np.ndarray):
         self.rotation = rotation
     
-    def __mul__(self, other: "Pose | np.ndarray"):
-        if isinstance(other, Pose):
-            return Pose(self.position + self.rotation @ other.position, self.rotation @ other.rotation)
-        elif isinstance(other, np.ndarray):
-            return self.position + self.rotation @ other
-        raise TypeError(f"unsupported operand type: {type(other)}")
+    def __mul__(self, other: "Pose"):
+        return Pose(self.position + self.rotation @ other.position, self.rotation @ other.rotation)
+    
+    def apply_point(self, point: np.ndarray) -> np.ndarray:
+        return self.position + self.rotation @ point
+    
+    def apply_vector(self, vector: np.ndarray) -> np.ndarray:
+        return self.rotation @ vector
 
     def inverse(self) -> "Pose":
         return Pose(self.rotation.T @ -self.position, self.rotation.T)

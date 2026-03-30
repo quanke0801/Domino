@@ -13,9 +13,9 @@ PALETTE = [
     "0.96 0.96 0.96", # White
     "0.92 0.39 0.12", # Orange
     "0.86 0.16 0.16", # Red
-    "0.55 0.24 0.71", # Purple
-    "0.90 0.35 0.55", # Pink
-    "0.39 0.20 0.16", # Brown
+    # "0.55 0.24 0.71", # Purple
+    # "0.90 0.35 0.55", # Pink
+    # "0.39 0.20 0.16", # Brown
     "0.12 0.12 0.12", # Black
     "0.94 0.82 0.08", # Yellow
     "0.12 0.63 0.24", # Green
@@ -59,13 +59,15 @@ def CompileWorld(scene: Component) -> str:
   <option
     timestep="{TIME_STEP}"
     gravity="0 0 -9.81"
+    integrator="implicit"
+    cone="elliptic"
     solver="Newton"
     iterations="100"
     noslip_iterations="5"
     noslip_tolerance="0.00001"
   />
   <default>
-    <geom solref="{TIME_STEP * 10} 1" solimp="0.99 0.99 0.002" friction="1 0.005 0.0001"/>
+    <geom solref="{TIME_STEP * 1} 1" solimp="0.99 0.99 0.002" friction="1 0.005 0.0001"/>
   </default>
   <visual>
     <global offwidth="1280" offheight="720"/>
@@ -153,18 +155,18 @@ def build_scene_2() -> Component:
         .place_abs("x+", np.array([-1, 0, 0]))
         .move_to_touch(np.array([1, 0, 0]), scene.child("shaft_slanted"))
     ))
-    scene.add_child("shim", (
-        Domino()
-        .orient(Domino.sideways())
-        .place_snap("x+y-", scene.child("shaft_flat").anchor("x+z-"))
-        .move(np.array([-0.01, 0, 0]))
-    ))
+    # scene.add_child("shim", (
+    #     Domino()
+    #     .orient(Domino.sideways())
+    #     .place_snap("x+y-", scene.child("shaft_flat").anchor("x+z-"))
+    #     .move(np.array([-0.01, 0, 0]))
+    # ))
     scene.add_child("trigger", (
         Domino()
         .orient(Domino.standing())
-        .place_snap("x+z-", scene.child("shaft_flat").anchor("x+z-"))
-        .move(np.array([-0.075, 0, 0]))
-        .rotate("x+z-", np.array([0, 1, 0]), np.radians(10))
+        .place_snap("x-z-", scene.child("support").anchor("x+y+"))
+        .move(np.array([0.125, 0, 0]))
+        .rotate("x+z-", np.array([0, 1, 0]), np.radians(-10))
     ))
 
     return scene

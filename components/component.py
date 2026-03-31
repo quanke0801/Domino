@@ -13,11 +13,31 @@ class PointRef:
     component: "Component | None"
     point: np.ndarray
 
+    def to_world(self) -> np.ndarray:
+        if self.component is None:
+            return self.point
+        return self.component.to_world().apply_point(self.point)
+    
+    def to_other(self, other: "Component | None") -> np.ndarray:
+        if other is None:
+            return self.to_world()
+        return other.to_world().inverse().apply_point(self.to_world())
+
 
 @dataclass
 class VectorRef:
     component: "Component | None"
     vector: np.ndarray
+
+    def to_world(self) -> np.ndarray:
+        if self.component is None:
+            return self.vector
+        return self.component.to_world().apply_vector(self.vector)
+    
+    def to_other(self, other: "Component | None") -> np.ndarray:
+        if other is None:
+            return self.to_world()
+        return other.to_world().inverse().apply_vector(self.to_world())
 
 
 class Component:
@@ -54,7 +74,7 @@ class Component:
         if isinstance(axis, str):
             return VectorRef(self, Component.NAME_TO_AXIS[axis])
         elif isinstance(axis, np.ndarray):
-            return VectorRef(self, axis / np.linalg.norm(axis))
+            return VectorRef(self, axis)
         else:
             raise ValueError(f"unsupported axis type: {type(axis)}")
     
@@ -67,8 +87,10 @@ class Component:
             return self.to_parent
         return self.parent.to_world() * self.to_parent
     
-    def to_other(self, other: "Component") -> Pose:
-        return other.to_world().inverse() * self.to_world() if other is not None else self.to_world()
+    def to_other(self, other: "Component | None") -> Pose:
+        if other is None:
+            return self.to_world()
+        return other.to_world().inverse() * self.to_world()
     
     # These method should not be needed.
 
@@ -98,9 +120,8 @@ class Component:
     #     return self
     
     def place(self, anchor: str, target: PointRef) -> "Component":
-        anchor_in_parent = self.to_parent.apply_point(self.anchors[anchor])
-        target_to_parent = target.component.to_other(self.parent)
-        target_in_parent = target_to_parent.apply_point(target.point)
+        anchor_in_parent = self.to_parent.apply_vector(self.anchors[anchor])
+        target_in_parent = target.to_other(self.parent)
         self.to_parent.set_position(target_in_parent - anchor_in_parent)
         return self
 
@@ -108,7 +129,7 @@ class Component:
         if isinstance(delta, np.ndarray):
             delta_in_parent = self.to_parent.apply_vector(delta)
         elif isinstance(delta, VectorRef):
-            delta_in_parent = delta.component.to_other(self.parent).apply_vector(delta.vector)
+            delta_in_parent = delta.to_other(self.parent)
         else:
             raise ValueError(f"unsupported delta type: {type(delta)}")
         self.to_parent.set_position(self.to_parent.position + delta_in_parent)
@@ -123,7 +144,7 @@ class Component:
         elif isinstance(anchor, np.ndarray):
             anchor_local = anchor
         elif isinstance(anchor, PointRef):
-            anchor_local = anchor.component.to_other(self).apply_point(anchor.point)
+            anchor_local = anchor.to_other(self)
         else:
             raise ValueError(f"unsupported anchor type: {type(anchor)}")
         # Resolve axis direction in local frame.
@@ -132,7 +153,7 @@ class Component:
         elif isinstance(axis, np.ndarray):
             axis_local = axis / np.linalg.norm(axis)
         elif isinstance(axis, VectorRef):
-            axis_local = axis.component.to_other(self).apply_vector(axis.vector)
+            axis_local = axis.to_other(self)
         else:
             raise ValueError(f"unsupported axis type: {type(axis)}")
         translation = Pose(position=anchor_local)
@@ -152,6 +173,7 @@ class Component:
 
 class Ground(Component):
     _instance = None
+    HALF_SIZE = np.array([10, 10, 1])
     
     def __new__(cls, *args, **kwargs):
         if cls._instance is None:
@@ -159,10 +181,10 @@ class Ground(Component):
         return cls._instance
     
     def to_world(self) -> Pose:
-        return Pose(position=np.array([0, 0, -1]))
+        return Pose(position=np.array([0, 0, -Ground.HALF_SIZE[2]]))
     
     def obb_in_world(self) -> OBB:
-        return OBB(self.to_world(), np.array([100, 100, 1]))
+        return OBB(self.to_world(), self.HALF_SIZE)
     
     def collect_leaves(self) -> list["Component"]:
         return [self]
@@ -185,6 +207,7 @@ Default local coordinate system:
 """
 class Domino(Component):
     SIZE = np.array([0.015, 0.05, 0.1])
+    LEAN_ANGLE = np.arctan(SIZE[0] / SIZE[2]) + 1.0E-2
 
     def __init__(self, to_parent: Pose | None = None):
         super().__init__(to_parent)
@@ -223,7 +246,7 @@ class Domino(Component):
         if isinstance(direction, np.ndarray):
             direction_in_world = direction / np.linalg.norm(direction)
         elif isinstance(direction, VectorRef):
-            direction_in_world = direction.component.to_world().apply_vector(direction.vector)
+            direction_in_world = direction.to_world()
         else:
             raise ValueError(f"unsupported direction type: {type(direction)}")
         # Resolve target OBBs in world frame.
@@ -259,7 +282,7 @@ class Domino(Component):
         elif isinstance(anchor, np.ndarray):
             anchor_local = anchor
         elif isinstance(anchor, PointRef):
-            anchor_local = anchor.component.to_other(self).apply_point(anchor.point)
+            anchor_local = anchor.to_other(self)
         else:
             raise ValueError(f"unsupported anchor type: {type(anchor)}")
         anchor_in_world = self.to_world().apply_point(anchor_local)
@@ -269,7 +292,7 @@ class Domino(Component):
         elif isinstance(axis, np.ndarray):
             axis_local = axis / np.linalg.norm(axis)
         elif isinstance(axis, VectorRef):
-            axis_local = axis.component.to_other(self).apply_vector(axis.vector)
+            axis_local = axis.to_other(self)
         else:
             raise ValueError(f"unsupported axis type: {type(axis)}")
         axis_in_world = self.to_world().apply_vector(axis_local)
@@ -304,16 +327,89 @@ class PileDomino(Component):
             raise ValueError(f"pile_count must be positive, got {pile_count}")
         self.pile_count = pile_count
         self.size = np.array([Domino.SIZE[2], Domino.SIZE[1], Domino.SIZE[0] * pile_count])
-        self.add_child("0", Domino().orient(Domino.lying()).place_abs("x+", np.array([0, 0, 0])))
+        self.add_child("0", (
+            Domino().lying()
+            .place("x+", self.anchor(""))
+        ))
         for i in range(1, pile_count):
-            self.add_child(
-                f"{i}",
-                Domino().orient(Domino.lying()).place_snap("x+", AnchorRef(self.children[f"{i - 1}"], "x-"))
-            )
+            self.add_child(f"{i}", (
+                Domino().lying()
+                .place("x+", self.child(f"{i - 1}").anchor("x-"))
+            ))
         for sign_x, label_x in [(-1, "x-"), (0, ""), (1, "x+")]:
             for sign_y, label_y in [(-1, "y-"), (0, ""), (1, "y+")]:
-                for sign_z, label_z in [(-1, "z-"), (0, ""), (1, "z+")]:
+                # NOTE PileDomino's origin is at bottom center.
+                for sign_z, label_z in [(0, "z-"), (1, ""), (2, "z+")]:
                     anchor_name = f"{label_x}{label_y}{label_z}"
                     anchor_position_local = np.array([sign_x, sign_y, sign_z]) * self.size / 2
                     self.anchors[anchor_name] = anchor_position_local
 
+
+class LineDomino(Component):
+    DEFAULT_GAP = Domino.SIZE[2] * 0.75
+    
+    def __init__(self, start: PointRef, end: PointRef, include: tuple[bool, bool] = (True, True), gap_ratio: float = 1.0):
+        super().__init__()
+        # Resolve start and end points in local frame.
+        start_local = start.to_other(self)[:2]
+        end_local = end.to_other(self)[:2]
+        # Resolve gap and count.
+        length = np.linalg.norm(end_local - start_local)
+        yaw = np.arctan2(end_local[1] - start_local[1], end_local[0] - start_local[0])
+        expected_gap = gap_ratio * self.DEFAULT_GAP
+        gap_count = int(np.ceil(length / expected_gap))
+        gap = length / gap_count
+        if gap_count <= 1 and not include[0] and not include[1]:
+            raise ValueError(f"length {length} is too short to create a line domino with gap ratio {gap_ratio}")
+        # Create dominoes.
+        indices = list(range(1, gap_count))
+        if include[0]:
+            indices.insert(0, 0)
+        if include[1]:
+            indices.append(gap_count)
+        for index in indices:
+            position_2d = start_local + (end_local - start_local) * index / gap_count
+            position_3d = np.array([position_2d[0], position_2d[1], 0])
+            self.add_child(f"{index}", (
+                Domino().standing()
+                .rotate("", np.array([0, 0, 1]), yaw)
+                .place("z-", self.anchor(position_3d))
+            ))
+    
+    def trigger(self) -> "LineDomino":
+        first = self.child("0")
+        first.rotate("x+z-", first.axis("y+"), Domino.LEAN_ANGLE)
+        return self
+
+
+class ConditionGate(Component):
+    def __init__(self):
+        super().__init__()
+        self.add_child("base", (
+            PileDomino(5)
+            .place("z-", self.anchor(""))
+            .rotate("", np.array([0, 0, 1]), np.pi / 2)
+        ))
+        # TODO Might be better to use sideways connection.
+        self.add_child("connection", (
+            Domino.lying()
+            .place("x+y+", self.child("base").anchor("x+z+"))
+            .move(self.axis(np.array([0, Domino.SIZE[0], 0])))
+        ))
+        self.add_child("pusher", (
+            Domino.standing(-np.pi / 2)
+            .place("x+z-", self.child("connection").anchor("y+"))
+            .move_to_touch(self.axis(np.array([0, 0, -1])), Ground())
+        ))
+        self.add_child("blocker", (
+            PileDomino(3)
+            .rotate("x+z-", "y+", np.pi / 2)
+            .place("x+y+", self.child("base").anchor("x-z-"))
+        ))
+
+
+
+class ImpulseTrigger(Component):
+    def __init__(self):
+        super().__init__()
+        # TODO

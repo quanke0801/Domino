@@ -42,7 +42,7 @@ def CompileComponent(component: Component, to_world: Pose, xml_body_specs: list[
                 type="box"
                 size="{Domino.SIZE[0] / 2} {Domino.SIZE[1] / 2} {Domino.SIZE[2] / 2}"
                 density="1000"
-                friction="0.2 0.005 0.0001"
+                friction="0.25 0.005 0.0001"
                 rgba="{np.random.choice(PALETTE)} 1"/>
         </body>"""
         xml_body_specs.append(xml_body_spec)
@@ -54,6 +54,7 @@ def CompileComponent(component: Component, to_world: Pose, xml_body_specs: list[
 def CompileWorld(scene: Component) -> str:
     xml_body_specs = []
     CompileComponent(scene, scene.to_parent, xml_body_specs)
+    ground_obb = Ground().obb_in_world()
     xml = f"""
 <mujoco model="world">
   <option
@@ -79,8 +80,8 @@ def CompileWorld(scene: Component) -> str:
     <material name="grid" texture="grid" texrepeat="6 6" texuniform="true" reflectance="0.05"/>
   </asset>
   <worldbody>
-    <light pos="0 0 2"/>
-    <geom name="ground" type="plane" pos="0 0 0" size="2 2 0.1" material="grid"
+    <light pos="-2 -2 5"/>
+    <geom name="ground" type="plane" pos="0 0 0" size="{ground_obb.half_extents[0]} {ground_obb.half_extents[1]} 0.1" material="grid"
           friction="1.0 0.01 0.001" priority="1" />
 {"\n".join(xml_body_specs)}
   </worldbody>
@@ -138,36 +139,69 @@ def build_scene_2() -> Component:
     scene.add_child("output", (
         Domino().standing()
         .place("x+z-", scene.child("support").anchor("x-y-"))
-        .move(np.array([0.007, 0, 0]))
+        .move(np.array([0.005, 0, 0]))
     ))
     scene.add_child("shaft_slanted", (
         Domino().lying()
         .place("x+z+", scene.child("output").anchor("x-z-"))
-        .move(np.array([0.0009, 0, 0]))
+        # .move(np.array([0.0009, 0, 0]))
         .rotate_to_touch(np.array([0.0075, 0, 0.015]), np.array([0, -1, 0]), Ground())
     ))
-    scene.add_child("shaft_flat", (
-        Domino().lying()
-        .place("x+", scene.anchor(np.array([-1, 0, 0])))
-        .move_to_touch(np.array([1, 0, 0]), scene.child("shaft_slanted"))
-    ))
+    # scene.add_child("shaft_flat", (
+    #     Domino().lying()
+    #     .place("x+", scene.anchor(np.array([-1, 0, 0])))
+    #     .move_to_touch(np.array([1, 0, 0]), scene.child("shaft_slanted"))
+    # ))
     # scene.add_child("shim", (
     #     Domino()
     #     .orient(Domino.sideways())
     #     .place_snap("x+y-", scene.child("shaft_flat").anchor("x+z-"))
     #     .move(np.array([-0.01, 0, 0]))
     # ))
-    scene.add_child("trigger", (
-        Domino().standing()
-        .place("x-z-", scene.child("support").anchor("x+y+"))
-        .move(np.array([0.125, 0, 0]))
-        .rotate("x+z-", np.array([0, 1, 0]), np.radians(-10))
+    # scene.add_child("trigger", (
+    #     Domino().standing()
+    #     .place("x-z-", scene.child("support").anchor("x+y+"))
+    #     .move(np.array([0.125, 0, 0]))
+    #     .rotate("x+z-", np.array([0, 1, 0]), np.radians(-10))
+    # ))
+    return scene
+
+def build_scene_3() -> Component:
+    scene = Component()
+    # scene.add_child("x_axis", (
+    #     Domino.lying()
+    #     .place("x+", scene.anchor(""))
+    # ))
+    # scene.add_child("y_axis", (
+    #     Domino.lying(np.pi / 2)
+    #     .place("x+", scene.child("x_axis").anchor("x-"))
+    # ))
+    scene.add_child("line", (
+        LineDomino(
+            scene.anchor(np.array([-2, 0, 0])),
+            scene.anchor(np.array([2, 0, 0]))
+        ).trigger()
     ))
+    # trigger = scene.child("line").child("0")
+    # trigger.rotate("x+z-", trigger.axis("y+"), np.radians(10))
 
     return scene
 
+def build_scene_4() -> Component:
+    scene = Component()
+    scene.add_child("gate", (
+        ConditionGate()
+    ))
+    scene.add_child("line", (
+        LineDomino(
+            scene.anchor(np.array([0, 1, 0])),
+            scene.anchor(np.array([0, 0.15, 0]))
+        ).trigger()
+    ))
+    return scene
+
 def main() -> None:
-    scene = build_scene_2()
+    scene = build_scene_4()
     xml = CompileWorld(scene)
     model = mujoco.MjModel.from_xml_string(xml)
     data = mujoco.MjData(model)

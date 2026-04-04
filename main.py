@@ -6,8 +6,10 @@ import numpy as np
 import mujoco
 import mujoco.viewer
 
-from Domino.components.component import *
+from Domino.components import *
 from Domino.geometry.pose import Pose
+# from Domino.scenes.test_scenes import *
+from Domino.scenes.demo_scenes import *
 
 PALETTE = [
     "0.96 0.96 0.96", # White
@@ -24,7 +26,7 @@ PALETTE = [
 ]
 SEED = 42
 np.random.seed(SEED)
-SLOW_DOWN_FACTOR = 2
+SLOW_DOWN_FACTOR = 1
 TIME_STEP = 0.002
 
 def CompileComponent(component: Component, to_world: Pose, xml_body_specs: list[str] = []) -> None:
@@ -68,7 +70,7 @@ def CompileWorld(scene: Component) -> str:
     noslip_tolerance="0.00001"
   />
   <default>
-    <geom solref="{TIME_STEP * 1} 1" solimp="0.99 0.99 0.002" friction="1 0.005 0.0001"/>
+    <geom solref="{TIME_STEP * 5} 1" solimp="0.99 0.99 0.002" friction="1 0.005 0.0001"/>
   </default>
   <visual>
     <global offwidth="1280" offheight="720"/>
@@ -91,121 +93,17 @@ def CompileWorld(scene: Component) -> str:
 
 def configure_camera(camera: mujoco.MjvCamera) -> None:
     camera.azimuth = 90
-    camera.elevation = -20
-    camera.distance = 1.5
+    camera.elevation = -45
+    camera.distance = 2
     camera.lookat[:] = [0, 0, 0]
 
-def build_scene_1() -> Component:
-    scene = Component()
-    scene.add_child("A", (
-        Domino()
-        .orient(Domino.standing(-np.pi / 8))
-        .place_abs("z-", np.array([0, 0, 0]))
-    ))
-    scene.add_child("B", (
-        Domino()
-        .orient(Domino.standing(np.pi / 18))
-        .rotate(None, np.array([0, 1, 0]), np.pi / 6)
-        .place_abs("z-", np.array([0.2, 0, 0.04]))
-        .move_to_touch(np.array([-1, 0, 0]), scene.children["A"])
-        # .place_snap("z-", AnchorRef(scene.children["A"], "z+"))
-    ))
-    # scene.move(np.array([0.1, 0, 0.1]))
-    # scene.rotate(AnchorRef(scene.children["A"], "x-y-z-"), np.array([0, 0, 1]), np.pi / 6)
-    
-    scene.add_child("P", (
-        PileDomino(10)
-        .move(np.array([-0.2, 0, 0.1]))
-        .rotate(None, np.array([1, 1, 0]), np.pi / 3)
-    ))
-
-    scene.add_child("C", (
-        Domino()
-        .orient(Domino.sideways(-np.pi / 4))
-        .rotate(None, np.array([0, 1, 0]), -np.pi / 6)
-        .place_abs("", np.array([-0.2, -0.2, 0.1]))
-        .move_to_touch(np.array([0.1, 1, -3.3]), None)
-        # .place_snap("z-", AnchorRef(scene.children["A"], "z+"))
-    ))
-    
-    return scene
-
-def build_scene_2() -> Component:
-    scene = Component()
-    scene.add_child("support", (
-        Domino().lying(np.pi / 2)
-        .place("x+", scene.anchor(""))
-    ))
-    scene.add_child("output", (
-        Domino().standing()
-        .place("x+z-", scene.child("support").anchor("x-y-"))
-        .move(np.array([0.005, 0, 0]))
-    ))
-    scene.add_child("shaft_slanted", (
-        Domino().lying()
-        .place("x+z+", scene.child("output").anchor("x-z-"))
-        # .move(np.array([0.0009, 0, 0]))
-        .rotate_to_touch(np.array([0.0075, 0, 0.015]), np.array([0, -1, 0]), Ground())
-    ))
-    # scene.add_child("shaft_flat", (
-    #     Domino().lying()
-    #     .place("x+", scene.anchor(np.array([-1, 0, 0])))
-    #     .move_to_touch(np.array([1, 0, 0]), scene.child("shaft_slanted"))
-    # ))
-    # scene.add_child("shim", (
-    #     Domino()
-    #     .orient(Domino.sideways())
-    #     .place_snap("x+y-", scene.child("shaft_flat").anchor("x+z-"))
-    #     .move(np.array([-0.01, 0, 0]))
-    # ))
-    # scene.add_child("trigger", (
-    #     Domino().standing()
-    #     .place("x-z-", scene.child("support").anchor("x+y+"))
-    #     .move(np.array([0.125, 0, 0]))
-    #     .rotate("x+z-", np.array([0, 1, 0]), np.radians(-10))
-    # ))
-    return scene
-
-def build_scene_3() -> Component:
-    scene = Component()
-    # scene.add_child("x_axis", (
-    #     Domino.lying()
-    #     .place("x+", scene.anchor(""))
-    # ))
-    # scene.add_child("y_axis", (
-    #     Domino.lying(np.pi / 2)
-    #     .place("x+", scene.child("x_axis").anchor("x-"))
-    # ))
-    scene.add_child("line", (
-        LineDomino(
-            scene.anchor(np.array([-2, 0, 0])),
-            scene.anchor(np.array([2, 0, 0]))
-        ).trigger()
-    ))
-    # trigger = scene.child("line").child("0")
-    # trigger.rotate("x+z-", trigger.axis("y+"), np.radians(10))
-
-    return scene
-
-def build_scene_4() -> Component:
-    scene = Component()
-    scene.add_child("gate", (
-        ConditionGate()
-    ))
-    scene.add_child("line", (
-        LineDomino(
-            scene.anchor(np.array([0, 1, 0])),
-            scene.anchor(np.array([0, 0.15, 0]))
-        ).trigger()
-    ))
-    return scene
 
 def main() -> None:
-    scene = build_scene_4()
+    scene = scene_line_domino_analogy()
     xml = CompileWorld(scene)
     model = mujoco.MjModel.from_xml_string(xml)
     data = mujoco.MjData(model)
-    with mujoco.viewer.launch_passive(model, data) as viewer:
+    with mujoco.viewer.launch_passive(model, data, show_left_ui=False, show_right_ui=False) as viewer:
         configure_camera(viewer.cam)
         while viewer.is_running():
             start_time = time.time()
@@ -215,6 +113,9 @@ def main() -> None:
             dt = end_time - start_time
             if dt < model.opt.timestep:
                 time.sleep(model.opt.timestep * SLOW_DOWN_FACTOR - dt)
+            else:
+                print(f"Delay detected: {dt - model.opt.timestep}")
+    # mujoco.viewer.launch(model, data, show_left_ui=False, show_right_ui=False)
 
 if __name__ == "__main__":
     main()

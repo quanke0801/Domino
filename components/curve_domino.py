@@ -79,9 +79,9 @@ class CurveDomino(Component):
         for i in range(1, sample_count - 1):
             segment_length = np.linalg.norm(sample_points[i] - sample_points[i - 1])
             budget += segment_length
-            if budget > desired_gap:
+            if budget > gap:
                 # Lerp position and yaw.
-                blend = 1 - (budget - desired_gap) / segment_length
+                blend = 1 - (budget - gap) / segment_length
                 position = sample_points[i - 1] + blend * (sample_points[i] - sample_points[i - 1])
                 yaw = sample_yaws[i - 1] + blend * (sample_yaws[i] - sample_yaws[i - 1])
                 self.add_child(f"{domino_count}", (
@@ -89,7 +89,7 @@ class CurveDomino(Component):
                     .place("z-", self.anchor(position))
                     .rotate("", "z+", yaw)
                 ))
-                budget -= desired_gap
+                budget -= gap
                 domino_count += 1
         if include[1]:
             self.add_child(f"{domino_count}", (

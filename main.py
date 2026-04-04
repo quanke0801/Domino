@@ -24,9 +24,18 @@ PALETTE = [
     "0.20 0.71 0.86", # Light Blue / Cyan
     "0.08 0.31 0.71"  # Dark Blue
 ]
+MATERIALS = [
+f"""<material name="domino_mat_{i}"
+    rgba="{color} 1"
+    specular="0.35"
+    shininess="0.2"
+    reflectance="0.1"
+/>""" for i, color in enumerate(PALETTE)
+]
+
 SEED = 42
 np.random.seed(SEED)
-SLOW_DOWN_FACTOR = 1
+SLOW_DOWN_FACTOR = 2
 TIME_STEP = 0.005
 
 def CompileComponent(component: Component, to_world: Pose, xml_body_specs: list[str] = []) -> None:
@@ -40,12 +49,22 @@ def CompileComponent(component: Component, to_world: Pose, xml_body_specs: list[
         <body name="body_{body_id}" pos="{pos}" xyaxes="{xyaxes}">
             <freejoint/>
             <geom
-                name="geom_{body_id}"
+                name="collision_{body_id}"
                 type="box"
                 size="{Domino.SIZE[0] / 2} {Domino.SIZE[1] / 2} {Domino.SIZE[2] / 2}"
                 density="1000"
                 friction="0.25 0.005 0.0001"
-                rgba="{np.random.choice(PALETTE)} 1"/>
+                group="1"
+            />
+            <geom
+                name="visual_{body_id}"
+                type="mesh"
+                mesh="domino_bevel_mesh"
+                material="domino_mat_{np.random.randint(len(PALETTE))}"
+                contype="0"
+                conaffinity="0"
+                group="0"
+            />
         </body>"""
         xml_body_specs.append(xml_body_spec)
         return
@@ -77,9 +96,11 @@ def CompileWorld(scene: Component) -> str:
     <headlight ambient="0.5 0.5 0.5" diffuse="0.8 0.8 0.8" specular="0.15 0.15 0.15"/>
   </visual>
   <asset>
+    <mesh name="domino_bevel_mesh" file="Domino/assets/domino_bevel.obj"/>
     <texture name="grid" type="2d" builtin="checker" width="512" height="512"
              rgb1="0.2 0.3 0.4" rgb2="0.1 0.15 0.2"/>
     <material name="grid" texture="grid" texrepeat="6 6" texuniform="true" reflectance="0.05"/>
+    {"\n".join(MATERIALS)}
   </asset>
   <worldbody>
     <light pos="-2 -2 5"/>
@@ -95,18 +116,21 @@ def configure_camera(camera: mujoco.MjvCamera) -> None:
     camera.azimuth = 90
     camera.elevation = -45
     camera.distance = 2
+    # camera.distance = 0.5
     camera.lookat[:] = [0, 0, 0]
 
 
 def main() -> None:
-    # scene = scene_line_domino_analogy()
-    scene = build_scene_6()
+    scene = scene_condition_gate_run()
+    # scene = build_scene_6()
     xml = CompileWorld(scene)
     model = mujoco.MjModel.from_xml_string(xml)
     data = mujoco.MjData(model)
     with mujoco.viewer.launch_passive(model, data, show_left_ui=False, show_right_ui=False) as viewer:
+        viewer.opt.geomgroup[1] = 0
         configure_camera(viewer.cam)
         while viewer.is_running():
+            # viewer.cam.azimuth += 360 / 5 * TIME_STEP
             start_time = time.time()
             mujoco.mj_step(model, data)
             viewer.sync()

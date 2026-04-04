@@ -1,5 +1,6 @@
 from .component import Component, PointRef, VectorRef
 from .condition_gate import ConditionGate
+from .curve_domino import CurveDomino
 from .domino import Domino
 from .elegant_and_gate import ElegantAndGate
 from .ground import Ground
@@ -13,6 +14,7 @@ __all__ = [
     "PointRef",
     "VectorRef",
     "ConditionGate",
+    "CurveDomino",
     "Domino",
     "ElegantAndGate",
     "Ground",

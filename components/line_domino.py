@@ -1,6 +1,6 @@
 import numpy as np
 
-from Domino.components.component import Component, PointRef
+from Domino.components.component import Component, PointRef, SocketRef
 from Domino.components.domino import Domino
 
 
@@ -20,7 +20,7 @@ class LineDomino(Component):
         gap = length / gap_count
         if gap_count <= 1 and not include[0] and not include[1]:
             raise ValueError(f"length {length} is too short to create a line domino with gap ratio {gap_ratio}")
-        # Create dominoes.
+        # Place dominoes.
         indices = list(range(1, gap_count))
         if include[0]:
             indices.insert(0, 0)
@@ -37,19 +37,27 @@ class LineDomino(Component):
                 .rotate("", np.array([0, 0, 1]), yaw + delta_yaw)
                 .place("z-", self.anchor(position_3d))
             ))
-    
+
+    @staticmethod
+    def from_socket(socket: SocketRef, length: float, gap_ratio: float = 1.0) -> "LineDomino":
+        start_point = PointRef(socket.component, socket.position)
+        end_point = PointRef(socket.component, socket.position + socket.direction * length)
+        return LineDomino(start_point, end_point, [False, True], gap_ratio)
+
     @staticmethod
     def from_domino(domino: Domino, length: float, gap_ratio: float = 1.0) -> "LineDomino":
-        start_point = domino.anchor("")
-        end_point = domino.anchor(np.array([length, 0, 0]))
-        return LineDomino(start_point, end_point, [False, True], gap_ratio)
+        return LineDomino.from_socket(domino.socket("out"), length, gap_ratio)
+    
+    @staticmethod
+    def to_socket(socket: SocketRef, length: float, gap_ratio: float = 1.0) -> "LineDomino":
+        start_point = PointRef(socket.component, socket.position - socket.direction * length)
+        end_point = PointRef(socket.component, socket.position)
+        return LineDomino(start_point, end_point, [True, False], gap_ratio)
     
     @staticmethod
     def to_domino(domino: Domino, length: float, gap_ratio: float = 1.0) -> "LineDomino":
-        start_point = domino.anchor(np.array([-length, 0, 0]))
-        end_point = domino.anchor("")
-        return LineDomino(start_point, end_point, [True, False], gap_ratio)
-    
+        return LineDomino.to_socket(domino.socket("in"), length, gap_ratio)
+
     def trigger(self) -> "LineDomino":
         first = self.child("0")
         first.rotate("x+z-", first.axis("y+"), Domino.LEAN_ANGLE)

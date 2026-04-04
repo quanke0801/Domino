@@ -53,3 +53,7 @@ class ConditionGate(Component):
             .move(np.array([Domino.SIZE[0], 0, 0]))
         ))
         del self.children["temp"]
+
+        self.add_socket("in", "in")
+        self.add_socket("out", "out")
+        self.add_socket("condition", "pusher")

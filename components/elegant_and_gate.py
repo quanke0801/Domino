@@ -45,3 +45,6 @@ class ElegantAndGate(Component):
             Domino.standing()
             .place("x-", self.child("out_temp").anchor("x+"))
         ))
+        self.add_socket("in_1", "in_1")
+        self.add_socket("in_2", "in_2")
+        self.add_socket("out", "out")

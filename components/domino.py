@@ -44,7 +44,10 @@ class Domino(Component):
     @staticmethod
     def standing(yaw: float = 0.0) -> "Domino":
         rotation = rotation_matrix_from_rpy(0, 0, yaw)
-        return Domino(Pose(rotation=rotation))
+        domino = Domino(Pose(rotation=rotation))
+        domino.add_socket("in", domino)
+        domino.add_socket("out", domino)
+        return domino
 
     @staticmethod
     def sideways(yaw: float = 0.0) -> "Domino":

@@ -48,3 +48,6 @@ class LeanAndGate(Component):
             .move(np.array([1, 0, 0]))
             .move_to_touch("x-", self.child("blocker_1"))
         ))
+        self.add_socket("in_1", "support_1")
+        self.add_socket("in_2", "support_2")
+        self.add_socket("out", "out")

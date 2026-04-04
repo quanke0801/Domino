@@ -8,7 +8,7 @@ import mujoco.viewer
 
 from Domino.components import *
 from Domino.geometry.pose import Pose
-# from Domino.scenes.test_scenes import *
+from Domino.scenes.test_scenes import *
 from Domino.scenes.demo_scenes import *
 
 PALETTE = [
@@ -27,7 +27,7 @@ PALETTE = [
 SEED = 42
 np.random.seed(SEED)
 SLOW_DOWN_FACTOR = 1
-TIME_STEP = 0.002
+TIME_STEP = 0.005
 
 def CompileComponent(component: Component, to_world: Pose, xml_body_specs: list[str] = []) -> None:
     if type(component) == Domino:
@@ -99,7 +99,8 @@ def configure_camera(camera: mujoco.MjvCamera) -> None:
 
 
 def main() -> None:
-    scene = scene_line_domino_analogy()
+    # scene = scene_line_domino_analogy()
+    scene = build_scene_6()
     xml = CompileWorld(scene)
     model = mujoco.MjModel.from_xml_string(xml)
     data = mujoco.MjData(model)

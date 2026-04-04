@@ -21,3 +21,6 @@ class OrGate(Component):
             .place("x+y+", self.child("out").anchor("x-y-"))
             .move(np.array([0, Domino.SIZE[0], 0]))
         ))
+        self.add_socket("in_1", "in_1")
+        self.add_socket("in_2", "in_2")
+        self.add_socket("out", "out")

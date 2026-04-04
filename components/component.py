@@ -39,6 +39,28 @@ class VectorRef:
         return other.to_world().inverse().apply_vector(self.to_world())
 
 
+@dataclass
+class SocketRef:
+    component: "Component | None"
+    position: np.ndarray
+    direction: np.ndarray
+
+    def to_world(self) -> np.ndarray:
+        if self.component is None:
+            return self.position, self.direction
+        component_to_world = self.component.to_world()
+        return component_to_world.apply_point(self.position), component_to_world.apply_vector(self.direction)
+    
+    def to_other(self, other: "Component | None") -> np.ndarray:
+        component_to_world, other_to_world = Pose(), Pose()
+        if self.component is not None:
+            component_to_world = self.component.to_world()
+        if other is not None:
+            other_to_world = other.to_world()
+        component_to_other = other_to_world.inverse() * component_to_world
+        return component_to_other.apply_point(self.position), component_to_other.apply_vector(self.direction)
+
+
 class Component:
     NAME_TO_AXIS = {
         "x+": np.array([1, 0, 0]),
@@ -63,6 +85,20 @@ class Component:
     
     def child(self, name: str) -> "Component":
         return self.children[name]
+    
+    def add_child(self, name: str, child: "Component") -> None:
+        child.parent = self
+        self.children[name] = child
+    
+    def connect(self, child1: str, socket1: str, child2: str, socket2: str) -> None:
+        from Domino.components.curve_domino import CurveDomino
+        name = f"{child1}_{socket1}_to_{child2}_{socket2}"
+        self.add_child(name, (
+            CurveDomino(
+                self.child(child1).socket(socket1),
+                self.child(child2).socket(socket2)
+            )
+        ))
 
     def anchor(self, anchor: str | np.ndarray) -> PointRef:
         if isinstance(anchor, str):
@@ -80,10 +116,23 @@ class Component:
         else:
             raise ValueError(f"unsupported axis type: {type(axis)}")
     
-    def add_child(self, name: str, child: "Component") -> None:
-        child.parent = self
-        self.children[name] = child
+    def socket(self, name: str) -> SocketRef:
+        return SocketRef(self, self.sockets[name][0], self.sockets[name][1])
     
+    def add_socket(self, socket_name: str, socket: "str | SocketRef | Domino") -> None:
+        from Domino.components.domino import Domino
+        if isinstance(socket, str):
+            position = self.child(socket).anchor("").to_other(self)
+            direction = self.child(socket).axis("x+").to_other(self)
+        elif isinstance(socket, SocketRef):
+            position, direction = socket.to_other(self)
+        elif isinstance(socket, Domino):
+            position = socket.anchor("").to_other(self)
+            direction = socket.axis("x+").to_other(self)
+        else:
+            raise ValueError(f"unsupported socket type: {type(socket)}")
+        self.sockets[socket_name] = (position, direction)
+
     def to_world(self) -> Pose:
         if self.parent is None:
             return self.to_parent

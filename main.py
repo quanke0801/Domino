@@ -121,8 +121,8 @@ def configure_camera(camera: mujoco.MjvCamera) -> None:
 
 
 def main() -> None:
-    # scene = scene_condition_gate_run()
-    scene = test_scene_copy()
+    scene = test_scene_side_branch()
+    # scene = test_scene_copy()
     xml = CompileWorld(scene)
     model = mujoco.MjModel.from_xml_string(xml)
     data = mujoco.MjData(model)

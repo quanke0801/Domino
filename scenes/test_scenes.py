@@ -161,13 +161,38 @@ def build_scene_8() -> Component:
 def test_scene_copy() -> Component:
     scene = Component()
     scene.add_child("gate", (
-        LeanAndGate()
+        ConditionGate().mirror("", scene.axis(np.array([1, 0.2, 0])))
+        .rotate("", "z+", np.pi)
     ))
     scene.add_child("other_gate", (
         scene.child("gate").copy()
         .mirror(
-            scene.anchor(np.array([0.3, 0, 0])),
+            scene.anchor(np.array([0.7, 0, 0])),
             scene.axis(np.array([0.8, 0.6, 0]))
         )
+        .rotate("", "z+", np.pi)
     ))
+    scene.connect("gate", "out", "other_gate", "in")
+    return scene
+
+def test_scene_side_branch() -> Component:
+    scene = Component()
+    scene.add_child("side_branch", (
+        SideBranch()
+    ))
+    scene.add_child("start", (
+        Domino().standing()
+        .place("z-", scene.anchor(np.array([-1, 0, 0])))
+    ))
+    scene.add_child("end_1", (
+        Domino().standing()
+        .place("z-", scene.anchor(np.array([1, 0, 0])))
+    ))
+    scene.add_child("end_2", (
+        Domino().standing(np.pi / 2)
+        .place("z-", scene.anchor(np.array([0, 1, 0])))
+    ))
+    scene.connect("start", "out", "side_branch", "in")
+    scene.connect("side_branch", "out_1", "end_1", "in")
+    scene.connect("side_branch", "out_2", "end_2", "in")
     return scene

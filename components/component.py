@@ -212,14 +212,114 @@ class Component:
         self.to_parent = self.to_parent * translation * rotation * translation.inverse()
         return self
     
-    def mirror(self, origin: PointRef, normal: VectorRef) -> "Component":
-        origin_in_parent = origin.to_other(self.parent)
-        normal_in_parent = normal.to_other(self.parent)
+    def mirror(self, origin: str | np.ndarray | PointRef, normal: str | np.ndarray | VectorRef) -> "Component":
+        # Resolve origin in parent frame.
+        if isinstance(origin, str):
+            origin_local = self.anchors[origin]
+        elif isinstance(origin, np.ndarray):
+            origin_local = origin
+        elif isinstance(origin, PointRef):
+            origin_local = origin.to_other(self)
+        else:
+            raise ValueError(f"unsupported origin type: {type(origin)}")
+        # Resolve normal in parent frame.
+        if isinstance(normal, str):
+            normal_local = Component.NAME_TO_AXIS[normal]
+        elif isinstance(normal, np.ndarray):
+            normal_local = normal
+        elif isinstance(normal, VectorRef):
+            normal_local = normal.to_other(self)
+        else:
+            raise ValueError(f"unsupported normal type: {type(normal)}")
+        origin_in_parent = self.to_parent.apply_point(origin_local)
+        normal_in_parent = self.to_parent.apply_vector(normal_local)
         normal_in_parent /= np.linalg.norm(normal_in_parent)
         normal_projection = 2 * np.outer(normal_in_parent, normal_in_parent)
         plane_reflection = np.eye(3) - normal_projection
         mirror = Pose(normal_projection @ origin_in_parent, plane_reflection)
         self.to_parent = mirror * self.to_parent
+        return self
+    
+    def move_to_touch(self, direction: str | np.ndarray | VectorRef, target: "Component | list[Component]") -> "Component":
+        # Resolve direction in world frame.
+        if isinstance(direction, str):
+            direction_in_world = self.axis(direction).to_world()
+        elif isinstance(direction, np.ndarray):
+            direction_in_world = direction / np.linalg.norm(direction)
+        elif isinstance(direction, VectorRef):
+            direction_in_world = direction.to_world()
+        else:
+            raise ValueError(f"unsupported direction type: {type(direction)}")
+        # Resolve target OBBs in world frame.
+        if isinstance(target, Component):
+            target_obbs = [leaf.obb_in_world() for leaf in target.collect_leaves()]
+        elif isinstance(target, list[Component]):
+            target_obbs = []
+            for target_component in target:
+                target_obbs.extend([leaf.obb_in_world() for leaf in target_component.collect_leaves()])
+        else:
+            raise ValueError(f"unsupported target type: {type(target)}")
+        # Find contact distance.
+        contact_distance = None
+        for leaf in self.collect_leaves():
+            leaf_obb = leaf.obb_in_world()
+            for target_obb in target_obbs:
+                target_contact_distance = SAT.slide_distance(leaf_obb, target_obb, direction_in_world)
+                if target_contact_distance is not None and target_contact_distance > 0:
+                    if contact_distance is None or target_contact_distance < contact_distance:
+                        contact_distance = target_contact_distance
+        if contact_distance is not None:
+            delta_in_world = contact_distance * direction_in_world
+            self.move(VectorRef(Ground(), delta_in_world))
+        else:
+            logger.warning(f"No contact found or already colliding with target {target}.")
+        return self
+    
+    def rotate_to_touch(self, anchor: None | str | np.ndarray | PointRef, axis: str | np.ndarray | VectorRef, target: "Component | list[Component]") -> "Component":
+        # Resolve anchor position in world frame.
+        if anchor is None:
+            anchor_local = np.array([0, 0, 0])
+        elif isinstance(anchor, str):
+            anchor_local = self.anchors[anchor]
+        elif isinstance(anchor, np.ndarray):
+            anchor_local = anchor
+        elif isinstance(anchor, PointRef):
+            anchor_local = anchor.to_other(self)
+        else:
+            raise ValueError(f"unsupported anchor type: {type(anchor)}")
+        anchor_in_world = self.to_world().apply_point(anchor_local)
+        # Resolve axis direction in world frame.
+        if isinstance(axis, str):
+            axis_local = Component.NAME_TO_AXIS[axis]
+        elif isinstance(axis, np.ndarray):
+            axis_local = axis / np.linalg.norm(axis)
+        elif isinstance(axis, VectorRef):
+            axis_local = axis.to_other(self)
+        else:
+            raise ValueError(f"unsupported axis type: {type(axis)}")
+        axis_in_world = self.to_world().apply_vector(axis_local)
+        # Resolve target OBBs in world frame.
+        if isinstance(target, Component):
+            target_obbs = [leaf.obb_in_world() for leaf in target.collect_leaves()]
+        elif isinstance(target, list[Component]):
+            target_obbs = []
+            for target_component in target:
+                target_obbs.extend([leaf.obb_in_world() for leaf in target_component.collect_leaves()])
+        else:
+            raise ValueError(f"unsupported target type: {type(target)}")
+        # Find contact angle.
+        rotate_angle = None
+        for leaf in self.collect_leaves():
+            leaf_obb = leaf.obb_in_world()
+            for target_obb in target_obbs:
+                target_rotate_angle = SAT.rotate_angle(obb, target_obb, anchor_in_world, axis_in_world)
+                if target_rotate_angle is not None:
+                    if rotate_angle is None or target_rotate_angle < rotate_angle:
+                        rotate_angle = target_rotate_angle
+        if rotate_angle is not None:
+            self.rotate(anchor, axis, rotate_angle)
+        else:
+            logger.warning(f"No contact found or already colliding with target {target}.")
         return self
 
     def collect_leaves(self) -> list["Component"]:

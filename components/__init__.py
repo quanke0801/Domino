@@ -8,6 +8,7 @@ from .lean_and_gate import LeanAndGate
 from .line_domino import LineDomino
 from .pile_domino import PileDomino
 from .or_gate import OrGate
+from .side_branch import SideBranch
 
 __all__ = [
     "Component",
@@ -22,4 +23,5 @@ __all__ = [
     "LineDomino",
     "PileDomino",
     "OrGate",
+    "SideBranch",
 ]

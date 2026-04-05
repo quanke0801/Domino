@@ -211,6 +211,16 @@ class Component:
         rotation = Pose(rotation=rotation_matrix_from_axis_angle(axis_local, angle))
         self.to_parent = self.to_parent * translation * rotation * translation.inverse()
         return self
+    
+    def mirror(self, origin: PointRef, normal: VectorRef) -> "Component":
+        origin_in_parent = origin.to_other(self.parent)
+        normal_in_parent = normal.to_other(self.parent)
+        normal_in_parent /= np.linalg.norm(normal_in_parent)
+        normal_projection = 2 * np.outer(normal_in_parent, normal_in_parent)
+        plane_reflection = np.eye(3) - normal_projection
+        mirror = Pose(normal_projection @ origin_in_parent, plane_reflection)
+        self.to_parent = mirror * self.to_parent
+        return self
 
     def collect_leaves(self) -> list["Component"]:
         leaves = []

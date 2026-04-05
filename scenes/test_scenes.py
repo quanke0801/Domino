@@ -157,3 +157,17 @@ def build_scene_8() -> Component:
     # ))
     scene.connect("start", "out", "end", "in")
     return scene
+
+def test_scene_copy() -> Component:
+    scene = Component()
+    scene.add_child("gate", (
+        LeanAndGate()
+    ))
+    scene.add_child("other_gate", (
+        scene.child("gate").copy()
+        .mirror(
+            scene.anchor(np.array([0.3, 0, 0])),
+            scene.axis(np.array([0.8, 0.6, 0]))
+        )
+    ))
+    return scene

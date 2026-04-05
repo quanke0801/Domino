@@ -33,7 +33,7 @@ f"""<material name="domino_mat_{i}"
 />""" for i, color in enumerate(PALETTE)
 ]
 
-SEED = 42
+SEED = 48
 np.random.seed(SEED)
 SLOW_DOWN_FACTOR = 2
 TIME_STEP = 0.005
@@ -121,8 +121,8 @@ def configure_camera(camera: mujoco.MjvCamera) -> None:
 
 
 def main() -> None:
-    scene = scene_condition_gate_run()
-    # scene = build_scene_6()
+    # scene = scene_condition_gate_run()
+    scene = test_scene_copy()
     xml = CompileWorld(scene)
     model = mujoco.MjModel.from_xml_string(xml)
     data = mujoco.MjData(model)

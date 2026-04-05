@@ -20,6 +20,7 @@ class Pose:
             rotation: np.ndarray = np.eye(3)
     ):
         # TODO Check if position and rotation are valid.
+        # NOTE Here the rotation also encodes reflection.
         self.position = np.array(position)
         self.rotation = np.array(rotation)
     

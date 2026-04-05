@@ -273,3 +273,20 @@ def test_scene_crossing() -> Component:
     scene.connect("start_2", "out", "crossing", "in_2")
     scene.connect("crossing", "out_2", "end_2", "in")
     return scene
+
+def test_scene_u_turn() -> Component:
+    scene = Component()
+    scene.add_child("u_turn", (
+        UTurn()
+    ))
+    scene.add_child("start", (
+        Domino().standing()
+        .place("z-", scene.anchor(np.array([-1, -0.2, 0])))
+    ))
+    scene.add_child("end", (
+        Domino().standing(np.pi)
+        .place("z-", scene.anchor(np.array([-1, 0.2, 0])))
+    ))
+    scene.connect("start", "out", "u_turn", "in_1")
+    scene.connect("u_turn", "out_1", "end", "in")
+    return scene

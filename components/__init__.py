@@ -12,6 +12,7 @@ from .negative_condition_gate import NegativeConditionGate
 from .pile_domino import PileDomino
 from .or_gate import OrGate
 from .side_branch import SideBranch
+from .u_turn import UTurn
 
 __all__ = [
     "Component",
@@ -30,4 +31,5 @@ __all__ = [
     "PileDomino",
     "OrGate",
     "SideBranch",
+    "UTurn",
 ]

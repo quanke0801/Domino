@@ -6,7 +6,7 @@ from Domino.components.ground import Ground
 
 
 class ImpulseTrigger(Component):
-    EDGE_HANG = Domino.SIZE[0] * 0.45
+    EDGE_HANG = Domino.SIZE[0] * 0.4
     SHRINK_GAP_ITERATIONS = 3
 
     def __init__(self):

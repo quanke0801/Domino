@@ -35,8 +35,9 @@ f"""<material name="domino_mat_{i}"
 
 SEED = 42
 np.random.seed(SEED)
-SLOW_DOWN_FACTOR = 2
+SLOW_DOWN_FACTOR = 5
 TIME_STEP = 0.005
+WARM_UP_TIME = 0.0
 
 def CompileComponent(component: Component, to_world: Pose, xml_body_specs: list[str] = []) -> None:
     if type(component) == Domino:
@@ -53,7 +54,7 @@ def CompileComponent(component: Component, to_world: Pose, xml_body_specs: list[
                 type="box"
                 size="{Domino.SIZE[0] / 2} {Domino.SIZE[1] / 2} {Domino.SIZE[2] / 2}"
                 density="1000"
-                friction="0.25 0.005 0.0001"
+                friction="0.2 0.005 0.0001"
                 group="1"
             />
             <geom
@@ -114,29 +115,31 @@ def CompileWorld(scene: Component) -> str:
 
 def configure_camera(camera: mujoco.MjvCamera) -> None:
     camera.azimuth = 90
-    camera.elevation = -45
-    camera.distance = 2
+    camera.elevation = -60
+    camera.distance = 2.5
     # camera.distance = 0.5
     camera.lookat[:] = [0, 0, 0]
 
 
 def main() -> None:
-    scene = test_scene_crossing()
-    # scene = scene_negative_condition_gate_run()
+    # scene = test_scene_u_turn()
+    scene = scene_half_adder()
     xml = CompileWorld(scene)
     model = mujoco.MjModel.from_xml_string(xml)
     data = mujoco.MjData(model)
     with mujoco.viewer.launch_passive(model, data, show_left_ui=False, show_right_ui=False) as viewer:
         viewer.opt.geomgroup[1] = 0
         configure_camera(viewer.cam)
+        sim_start_time = time.time()
         while viewer.is_running():
             # viewer.cam.azimuth += 360 / 5 * TIME_STEP
-            start_time = time.time()
-            mujoco.mj_step(model, data)
+            frame_start_time = time.time()
+            if frame_start_time - sim_start_time > WARM_UP_TIME:
+                mujoco.mj_step(model, data)
             viewer.sync()
-            end_time = time.time()
-            dt = end_time - start_time
-            if dt < model.opt.timestep:
+            frame_end_time = time.time()
+            dt = frame_end_time - frame_start_time
+            if dt < model.opt.timestep * SLOW_DOWN_FACTOR:
                 time.sleep(model.opt.timestep * SLOW_DOWN_FACTOR - dt)
             else:
                 print(f"Delay detected: {dt - model.opt.timestep}")

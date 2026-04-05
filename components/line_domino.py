@@ -37,6 +37,8 @@ class LineDomino(Component):
                 .rotate("", np.array([0, 0, 1]), yaw + delta_yaw)
                 .place("z-", self.anchor(position_3d))
             ))
+        self.add_socket("in", self.child(f"{indices[0]}").socket("in"))
+        self.add_socket("out", self.child(f"{indices[-1]}").socket("out"))
 
     @staticmethod
     def from_socket(socket: SocketRef, length: float, gap_ratio: float = 1.0) -> "LineDomino":

@@ -42,6 +42,11 @@ class LeanAndGate(Component):
             .move_to_touch("z-", self.child("trigger_base"))
             .rotate_to_touch("x+z-", np.array([0, 1, 0]), self.child("blocker_1"))
         ))
+        self.add_child("trigger_support", (
+            Domino.lying()
+            .place("x+z+", self.child("trigger_base").anchor("x-z-"))
+            .move_to_touch("z+", self.child("trigger"))
+        ))
         self.add_child("out", (
             Domino.standing()
             .place("z-", self.anchor(""))

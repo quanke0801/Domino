@@ -61,3 +61,7 @@ class Domino(Component):
 
     def obb_in_world(self) -> OBB:
         return OBB(self.to_world(), Domino.SIZE / 2)
+    
+    def trigger(self) -> "Domino":
+        self.rotate("x+z-", "y+", Domino.LEAN_ANGLE)
+        return self

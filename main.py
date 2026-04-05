@@ -33,7 +33,7 @@ f"""<material name="domino_mat_{i}"
 />""" for i, color in enumerate(PALETTE)
 ]
 
-SEED = 48
+SEED = 42
 np.random.seed(SEED)
 SLOW_DOWN_FACTOR = 2
 TIME_STEP = 0.005
@@ -89,7 +89,7 @@ def CompileWorld(scene: Component) -> str:
     noslip_tolerance="0.00001"
   />
   <default>
-    <geom solref="{TIME_STEP * 5} 1" solimp="0.99 0.99 0.002" friction="1 0.005 0.0001"/>
+    <geom solref="0.025 1" solimp="0.99 0.99 0.002" friction="1 0.005 0.0001"/>
   </default>
   <visual>
     <global offwidth="1280" offheight="720"/>
@@ -121,8 +121,8 @@ def configure_camera(camera: mujoco.MjvCamera) -> None:
 
 
 def main() -> None:
-    scene = test_scene_side_branch()
-    # scene = test_scene_copy()
+    scene = test_scene_crossing()
+    # scene = scene_negative_condition_gate_run()
     xml = CompileWorld(scene)
     model = mujoco.MjModel.from_xml_string(xml)
     data = mujoco.MjData(model)

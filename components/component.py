@@ -1,5 +1,7 @@
 from copy import deepcopy
 from dataclasses import dataclass
+import logging
+logger = logging.getLogger(__name__)
 
 import numpy as np
 
@@ -270,7 +272,8 @@ class Component:
                         contact_distance = target_contact_distance
         if contact_distance is not None:
             delta_in_world = contact_distance * direction_in_world
-            self.move(VectorRef(Ground(), delta_in_world))
+            delta_local = self.to_world().inverse().apply_vector(delta_in_world)
+            self.move(delta_local)
         else:
             logger.warning(f"No contact found or already colliding with target {target}.")
         return self
@@ -312,7 +315,7 @@ class Component:
         for leaf in self.collect_leaves():
             leaf_obb = leaf.obb_in_world()
             for target_obb in target_obbs:
-                target_rotate_angle = SAT.rotate_angle(obb, target_obb, anchor_in_world, axis_in_world)
+                target_rotate_angle = SAT.rotate_angle(leaf_obb, target_obb, anchor_in_world, axis_in_world)
                 if target_rotate_angle is not None:
                     if rotate_angle is None or target_rotate_angle < rotate_angle:
                         rotate_angle = target_rotate_angle

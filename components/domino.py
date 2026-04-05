@@ -1,6 +1,3 @@
-import logging
-logger = logging.getLogger(__name__)
-
 import numpy as np
 
 from Domino.components.component import Component, PointRef, VectorRef
@@ -47,6 +44,9 @@ class Domino(Component):
         domino = Domino(Pose(rotation=rotation))
         domino.add_socket("in", domino)
         domino.add_socket("out", domino)
+        domino_reversed = domino.copy().rotate("", "z+", np.pi)
+        domino.add_socket("in_reversed", domino_reversed)
+        domino.add_socket("out_reversed", domino_reversed)
         return domino
 
     @staticmethod

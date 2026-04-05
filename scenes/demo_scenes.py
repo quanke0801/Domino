@@ -107,3 +107,32 @@ def scene_condition_gate_run() -> Component:
     ))
     scene.connect("condition", "out", "gate", "condition")
     return scene
+
+def scene_negative_condition_gate_showcase() -> Component:
+    scene = Component()
+    scene.add_child("gate", (
+        NegativeConditionGate()
+    ))
+    return scene
+
+def scene_negative_condition_gate_run() -> Component:
+    scene = Component()
+    scene.add_child("gate", (
+        NegativeConditionGate()
+    ))
+    scene.add_child("start", (
+        Domino().standing()
+        .place("z-", scene.anchor(np.array([-1, 0, 0])))
+    ))
+    scene.add_child("end", (
+        Domino().standing()
+        .place("z-", scene.anchor(np.array([1, 0, 0])))
+    ))
+    scene.add_child("condition", (
+        Domino().standing(-np.pi / 2)
+        .place("z-", scene.anchor(np.array([-0.05, 1, 0])))
+    ))
+    scene.connect("start", "out", "gate", "in")
+    scene.connect("gate", "out", "end", "in")
+    scene.connect("condition", "out", "gate", "condition")
+    return scene

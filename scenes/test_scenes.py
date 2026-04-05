@@ -196,3 +196,80 @@ def test_scene_side_branch() -> Component:
     scene.connect("side_branch", "out_1", "end_1", "in")
     scene.connect("side_branch", "out_2", "end_2", "in")
     return scene
+
+def test_scene_impulse_trigger() -> Component:
+    scene = Component()
+    scene.add_child("shaft", (
+        Domino().lying()
+        .place("x+", scene.anchor(""))
+    ))
+    scene.add_child("trigger_1", (
+        ImpulseTrigger()
+        .place("", scene.anchor(np.array([1, 0, 0])))
+        .move_to_touch(scene.axis("x-"), scene.child("shaft"))
+    ))
+    scene.add_child("trigger_2", (
+        scene.child("trigger_1").copy()
+        .rotate(scene.anchor(""), scene.axis("z+"), np.pi)
+    ))
+    scene.add_child("line_1", (
+        LineDomino.to_socket(scene.child("trigger_1").socket("in"), 1)
+    ))
+    scene.add_child("line_2", (
+        LineDomino.from_socket(scene.child("trigger_2").socket("out"), 1)
+    ))
+    scene.add_child("perpendicular", (
+        Domino().standing(np.pi / 2)
+        .place("z-", scene.child("shaft").anchor("x-"))
+    ))
+    scene.add_child("line_3", (
+        LineDomino.from_socket(scene.child("perpendicular").socket("out"), 1)
+    ))
+    scene.add_child("line_4", (
+        LineDomino.to_socket(scene.child("perpendicular").socket("in"), 1)
+    ))
+    return scene
+
+def test_scene_disable_gate() -> Component:
+    scene = Component()
+    scene.add_child("gate", (
+        NegativeConditionGate()
+    ))
+    scene.add_child("line_1", (
+        LineDomino.to_socket(scene.child("gate").socket("in"), 1)
+    ))
+    scene.add_child("line_2", (
+        LineDomino.to_socket(scene.child("gate").socket("condition"), 1)
+    ))
+    scene.add_child("line_3", (
+        LineDomino.from_socket(scene.child("gate").socket("out"), 1)
+    ))
+    return scene
+
+def test_scene_crossing() -> Component:
+    scene = Component()
+    scene.add_child("crossing", (
+        Crossing()
+    ))
+    span = 0.5
+    scene.add_child("start_1", (
+        Domino().standing()
+        .place("z-", scene.anchor(np.array([-span, 0, 0])))
+    ))
+    scene.add_child("end_1", (
+        Domino().standing()
+        .place("z-", scene.anchor(np.array([span, 0, 0])))
+    ))
+    scene.add_child("start_2", (
+        Domino().standing(np.pi / 2)
+        .place("z-", scene.anchor(np.array([0, -span, 0])))
+    ))
+    scene.add_child("end_2", (
+        Domino().standing(np.pi / 2)
+        .place("z-", scene.anchor(np.array([0, span, 0])))
+    ))
+    scene.connect("start_1", "out", "crossing", "in_1")
+    scene.connect("crossing", "out_1", "end_1", "in")
+    scene.connect("start_2", "out", "crossing", "in_2")
+    scene.connect("crossing", "out_2", "end_2", "in")
+    return scene
